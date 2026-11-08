@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="8 8 444 168" width="100%" height="100%" fill="none">
+  <defs>
+    <style>
+      @import url('https://fonts.maateen.me/kalpurush/font.css');
+    </style>
+    <linearGradient id="dark_emeraldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#059669" />
+      <stop offset="50%" stop-color="#006A4E" />
+      <stop offset="100%" stop-color="#064E3B" />
+    </linearGradient>
+    <linearGradient id="dark_mintGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10B981" />
+      <stop offset="100%" stop-color="#6EE7B7" />
+    </linearGradient>
+    <linearGradient id="dark_crimsonGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF4D5E" />
+      <stop offset="55%" stop-color="#C8102E" />
+      <stop offset="100%" stop-color="#991B1B" />
+    </linearGradient>
+    <linearGradient id="dark_coralGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#FB7185" />
+      <stop offset="100%" stop-color="#E11D48" />
+    </linearGradient>
+    <filter id="dark_softShadow" x="-15%" y="-15%" width="135%" height="135%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#10B981" flood-opacity="0.30" />
+    </filter>
+  </defs>
+
+  <g transform="translate(4, 4)" filter="url(#dark_softShadow)">
+    <circle cx="90" cy="90" r="82" fill="none" stroke="url(#dark_mintGrad)" stroke-width="3.5" opacity="0.75" />
+    <path d="M 90 16 C 49.1 16, 16 49.1, 16 90 C 16 108.5, 22.8 125.4, 34 138.4 L 22 164 L 51.5 154.2 C 63.1 160.5, 76.2 164, 90 164 C 130.9 164, 164 130.9, 164 90 C 164 49.1, 130.9 16, 90 16 Z" fill="url(#dark_emeraldGrad)" />
+    <path d="M 90 28 C 124.2 28, 152 55.8, 152 90 C 152 118, 133.5 141.6, 108 149.3 C 126 135, 136 114, 136 90 C 136 58, 115 34, 90 28 Z" fill="url(#dark_mintGrad)" opacity="0.4" />
+    <rect x="52" y="65" width="38" height="6" rx="3" fill="#A7F3D0" opacity="0.9" />
+    <rect x="52" y="80" width="28" height="6" rx="3" fill="#A7F3D0" opacity="0.75" />
+    <rect x="52" y="95" width="20" height="6" rx="3" fill="#A7F3D0" opacity="0.55" />
+    <path d="M 55 112 L 82 136 L 86 116 L 67 100 Z" fill="url(#dark_coralGrad)" />
+    <path d="M 82 136 L 148 38 L 104 118 Z" fill="url(#dark_crimsonGrad)" />
+    <path d="M 82 136 L 148 38 L 86 116 Z" fill="#FF6B7A" opacity="0.85" />
+    <circle cx="148" cy="38" r="8.5" fill="url(#dark_crimsonGrad)" stroke="#FFFFFF" stroke-width="2.5" />
+  </g>
+
+  <g transform="translate(186, 0)">
+    <text x="0" y="108" font-family="'Kalpurush', sans-serif" font-size="78" font-weight="800" fill="#FFFFFF" letter-spacing="0.5">দিশারী</text>
+    <circle cx="244" cy="54" r="8.5" fill="url(#dark_crimsonGrad)" />
+    <circle cx="262" cy="54" r="5.5" fill="#10B981" />
+    <rect x="2" y="122" width="85" height="5.5" rx="2.75" fill="url(#dark_emeraldGrad)" />
+    <rect x="94" y="122" width="45" height="5.5" rx="2.75" fill="url(#dark_mintGrad)" />
+    <rect x="146" y="122" width="35" height="5.5" rx="2.75" fill="url(#dark_crimsonGrad)" />
+    <text x="2" y="150" font-family="'Kalpurush', sans-serif" font-size="21" font-weight="600" fill="#34D399" letter-spacing="0.5">ডিজিটাল নাগরিক সহায়ক</text>
+  </g>
+</svg>
