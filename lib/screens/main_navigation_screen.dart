@@ -32,10 +32,13 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     final dashboard = Provider.of<DashboardProvider>(context, listen: false);
 
     // If navigating to Locker (2), Deadlines (3), or Dashboard (4), ensure data is loaded
-    if (index == 2 || index == 3 || index == 4) {
+    if (index == 2 || index == 4) {
       if (auth.isLoggedIn) {
         dashboard.loadDashboardData(auth.user?.id, isDemo: auth.user?.id == 1);
       }
+    } else if (index == 3) {
+      // Deadlines are public civic dates available to all citizens
+      dashboard.loadDashboardData(auth.user?.id, isDemo: auth.user?.id == 1);
     }
   }
 

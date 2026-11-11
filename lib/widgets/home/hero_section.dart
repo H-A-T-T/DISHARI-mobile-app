@@ -241,7 +241,7 @@ class _HeroSectionState extends State<HeroSection> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                       Text(
-                                        '${item.fee} · ${item.processingTimeBn}',
+                                        '${AppConstants.formatFee(item.fee, isBn)} · ${isBn ? item.processingTimeBn : item.processingTimeEn}',
                                         style: GoogleFonts.notoSansBengali(
                                           fontSize: 11,
                                           color: AppColors.textSecondary,

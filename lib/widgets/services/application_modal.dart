@@ -80,7 +80,7 @@ class _ApplicationModalState extends State<ApplicationModal> {
     for (var doc in widget.service.requiredDocs) {
       final isMatched = docs.any((ud) => _matchesRequiredDoc(doc, ud));
       if (isMatched) {
-        attachedDocs.add(doc.nameBn);
+        attachedDocs.add(isBn ? doc.nameBn : doc.nameEn);
       }
     }
 

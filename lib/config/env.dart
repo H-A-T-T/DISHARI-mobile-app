@@ -31,4 +31,40 @@ class EnvConfig {
       return 'দিশারী';
     }
   }
+
+  /// Google Gemini API Key from .env
+  static String get geminiApiKey {
+    try {
+      return dotenv.env['GEMINI_API_KEY']?.trim() ??
+          dotenv.env['AI_API_KEY']?.trim() ??
+          '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// OpenAI API Key from .env
+  static String get openaiApiKey {
+    try {
+      return dotenv.env['OPENAI_API_KEY']?.trim() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Custom Agent or Proxy API URL from .env
+  static String get aiApiUrl {
+    try {
+      return dotenv.env['AI_API_URL']?.trim() ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// Returns true if any AI API key or URL is configured
+  static bool get hasAiConfigured {
+    return geminiApiKey.isNotEmpty ||
+        openaiApiKey.isNotEmpty ||
+        aiApiUrl.isNotEmpty;
+  }
 }

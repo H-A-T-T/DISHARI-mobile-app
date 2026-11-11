@@ -3,7 +3,9 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../config/constants.dart';
+import '../../config/env.dart';
 import '../../providers/language_provider.dart';
+import '../../services/agent_service.dart';
 
 class ChatMessage {
   final String id;
@@ -41,13 +43,16 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
   final ScrollController _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
 
+  bool _isTyping = false;
+  StateSetter? _modalSetState;
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_initialized) {
       final size = MediaQuery.of(context).size;
-      // Position bottom-right by default
-      _x = size.width - 70;
+      // Position bottom-right by default matching web
+      _x = size.width - 76;
       _y = size.height - 180;
       _initialized = true;
 
@@ -80,88 +85,92 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     return isBn ? AppConstants.toBengaliNumber(timeStr) : timeStr;
   }
 
-  void _sendMessage([String? customText]) {
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent + 80,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  Future<void> _sendMessage([String? customText]) async {
     final text = (customText ?? _inputController.text).trim();
     if (text.isEmpty) return;
 
     final langProvider = Provider.of<LanguageProvider>(context, listen: false);
     final isBn = langProvider.isBn;
 
-    setState(() {
-      _messages.add(
-        ChatMessage(
-          id: 'user-${DateTime.now().millisecondsSinceEpoch}',
-          isUser: true,
-          text: text,
-          time: _currentTimeString(isBn),
-        ),
-      );
-      _inputController.clear();
-    });
+    _inputController.clear();
 
+    final userMsg = ChatMessage(
+      id: 'user-${DateTime.now().millisecondsSinceEpoch}',
+      isUser: true,
+      text: text,
+      time: _currentTimeString(isBn),
+    );
+
+    setState(() {
+      _messages.add(userMsg);
+      _isTyping = true;
+    });
+    if (_modalSetState != null) {
+      _modalSetState!(() {});
+    }
     _scrollToBottom();
 
-    // Generate response matching web simulation
-    Future.delayed(const Duration(milliseconds: 600), () {
+    // Prepare recent history for AI context
+    final history = _messages
+        .where((m) => m.id != 'welcome')
+        .map((m) => (isUser: m.isUser, text: m.text))
+        .toList();
+
+    // Call AgentService (reads GEMINI_API_KEY / OPENAI_API_KEY from .env, or falls back to civic catalog)
+    try {
+      final reply = await AgentService.getReply(
+        prompt: text,
+        isBn: isBn,
+        history: history,
+      );
+
       if (!mounted) return;
 
-      String reply = '';
-      final lower = text.toLowerCase();
-
-      if (text.contains('পাসপোর্ট') || lower.contains('passport')) {
-        reply = isBn
-            ? 'পাসপোর্ট আবেদনের জন্য আপনার অনলাইন ভেরিফায়েড জন্ম নিবন্ধন বা এনআইডি (NID), পূর্বের পাসপোর্ট (যদি থাকে) এবং নাগরিক সনদ প্রয়োজন। সাধারণ ফি ৪,০২৫ টাকা এবং ২১ কার্যদিবসের মধ্যে ডেলিভারি হয়।'
-            : 'For passport applications, you need your online verified birth certificate or NID, old passport (if renewing), and citizen certificate. Standard fee is 4,025 BDT with 21 business days delivery.';
-      } else if (text.contains('জন্ম নিবন্ধন') || lower.contains('birth')) {
-        reply = isBn
-            ? 'অনলাইন জন্ম নিবন্ধনের জন্য bdris.gov.bd পোর্টালে ১৭ ডিজিটের জন্ম নিবন্ধন নম্বর ও জন্মতারিখ প্রদান করে সরাসরি যাচাই বা সংশোধনের আবেদন করতে পারবেন।'
-            : 'For online birth registration, submit your 17-digit certificate number and date of birth at bdris.gov.bd to verify or request amendments.';
-      } else if (text.contains('NID') || text.contains('এনআইডি') || lower.contains('nid')) {
-        reply = isBn
-            ? 'এনআইডি সংশোধনের জন্য services.nidw.gov.bd পোর্টালে রক্তের গ্রুপ, শিক্ষাগত সনদ বা জন্ম নিবন্ধনের অনলাইন প্রমাণক জমা দিন। ক্যাটাগরিভেদে ফি ২৩০ থেকে ৩৪৫ টাকা।'
-            : 'For NID corrections, upload educational certificates, blood test report, or birth certificate at services.nidw.gov.bd. Fees range from 230 to 345 BDT depending on type.';
-      } else if (text.contains('ভাতা') || lower.contains('allowance')) {
-        reply = isBn
-            ? 'বিধবা, বয়স্ক ও প্রতিবন্ধী ভাতার জন্য সমাজসেবা অধিদপ্তর (dss.gov.bd) পোর্টালে অথবা ইউনিয়ন পরিষদে আবেদন করতে হয়। এটি সম্পূর্ণ বিনামূল্যে এবং টাকা সরাসরি নগদ মোবাইল ব্যাংকিংয়ে আসে।'
-            : 'For widow, old-age, or disability allowances, apply at dss.gov.bd or your local Union Council. It is completely free and allowance funds are deposited directly to your Nagad wallet.';
-      } else if (text.contains('ট্রেড লাইসেন্স') || lower.contains('trade')) {
-        reply = isBn
-            ? 'ই-ট্রেড লাইসেন্সের জন্য etradelicense.gov.bd পোর্টালে ব্যবসার ধরন ও ভাড়ার চুক্তিপত্র জমা দিতে হয়। ফি ব্যবসার ধরনভেদে ১,২০০ টাকা থেকে শুরু।'
-            : 'For an e-Trade License, apply at etradelicense.gov.bd with business type and commercial rent deed. Government fees start from 1,200 BDT based on capital.';
-      } else if (text.contains('নামজারি') || text.contains('জমি') || lower.contains('land')) {
-        reply = isBn
-            ? 'ই-নামজারির জন্য mutation.land.gov.bd পোর্টালে ক্রয় দলিল, খতিয়ান ও হালনাগাদ দাখিলা জমা দিতে হবে। সরকারি মোট ফি ১,১৭০ টাকা এবং সময়সীমা ২৮ কার্যদিবস।'
-            : 'For e-Mutation, apply on mutation.land.gov.bd with registered deed, previous khatian, and up-to-date land tax receipt. Total official fee is 1,170 BDT and takes 28 working days.';
-      } else {
-        reply = isBn
-            ? 'আপনার প্রশ্নের জন্য ধন্যবাদ। দিশারীর ডাটাবেজে ৫০টির বেশি সরকারি সেবার বিস্তারিত নিয়মাবলী ও কাগজপত্রের তালিকা রয়েছে। সেবাসমূহ ট্যাবে গিয়ে সরাসরি অনুসন্ধান করতে পারেন।'
-            : 'Thank you for your question. Dishari features comprehensive step-by-step guides and documentation requirements for 50+ government services. Visit the Services directory to browse.';
-      }
+      final aiMsg = ChatMessage(
+        id: 'ai-${DateTime.now().millisecondsSinceEpoch}',
+        isUser: false,
+        text: reply,
+        time: _currentTimeString(isBn),
+      );
 
       setState(() {
+        _isTyping = false;
+        _messages.add(aiMsg);
+      });
+      if (_modalSetState != null) {
+        _modalSetState!(() {});
+      }
+      _scrollToBottom();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isTyping = false;
         _messages.add(
           ChatMessage(
-            id: 'ai-${DateTime.now().millisecondsSinceEpoch}',
+            id: 'ai-err-${DateTime.now().millisecondsSinceEpoch}',
             isUser: false,
-            text: reply,
+            text: AgentService.getLocalFallbackReply(text, isBn),
             time: _currentTimeString(isBn),
           ),
         );
       });
-      _scrollToBottom();
-    });
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
-        );
+      if (_modalSetState != null) {
+        _modalSetState!(() {});
       }
-    });
+      _scrollToBottom();
+    }
   }
 
   void _openChatDialog() {
@@ -174,12 +183,16 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
             'অনলাইনে জন্ম নিবন্ধন যাচাই কীভাবে করব?',
             'NID সংশোধন প্রক্রিয়ায় কত ফি লাগে?',
             'বয়স্ক ভাতার যোগ্যতার নিয়ম কী?',
+            'ই-নামজারিতে মোট কত টাকা খরচ হয়?',
+            'ই-ট্রেড লাইসেন্স করতে কী লাগে?',
           ]
         : [
             'Documents required for passport?',
             'How to verify birth registration?',
             'Fee required for NID correction?',
             'Eligibility for old-age allowance?',
+            'How much does e-Namjari cost?',
+            'Documents needed for Trade License?',
           ];
 
     showModalBottomSheet(
@@ -188,278 +201,484 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
       backgroundColor: Colors.transparent,
       builder: (ctx) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Container(
-              height: MediaQuery.of(context).size.height * 0.78,
-              decoration: const BoxDecoration(
-                color: AppColors.bgSurface,
-                border: Border(
-                  top: BorderSide(color: AppColors.primaryGreen, width: 3),
+          builder: (modalContext, setModalState) {
+            _modalSetState = setModalState;
+
+            final keyboardHeight = MediaQuery.of(modalContext).viewInsets.bottom;
+            final sheetHeight = MediaQuery.of(modalContext).size.height * 0.82;
+
+            return Padding(
+              padding: EdgeInsets.only(bottom: keyboardHeight),
+              child: Container(
+                height: sheetHeight,
+                decoration: const BoxDecoration(
+                  color: AppColors.bgSurface,
+                  border: Border(
+                    top: BorderSide(color: AppColors.primaryGreen, width: 3),
+                  ),
                 ),
-              ),
-              child: Column(
-                children: [
-                  // Chat Title Bar
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: const BoxDecoration(
-                      color: AppColors.bgSurface,
-                      border: Border(
-                        bottom: BorderSide(color: AppColors.border, width: 1),
+                child: Column(
+                  children: [
+                    // Chat Title Bar - Styled to match web JonobondhuChat exactly
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      decoration: const BoxDecoration(
+                        color: AppColors.bgSurface,
+                        border: Border(
+                          bottom: BorderSide(color: AppColors.border, width: 1),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              // Circular White Avatar matching website Jonobondhu AI
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.border, width: 1.5),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.05),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    ),
+                                  ],
+                                ),
+                                padding: const EdgeInsets.all(4),
+                                child: SvgPicture.asset(
+                                  'assets/icons/jonobondhu.svg',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Text(
+                                        isBn ? 'জনবন্ধু AI' : 'Jonobondhu AI',
+                                        style: GoogleFonts.notoSansBengali(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      if (EnvConfig.hasAiConfigured) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.lightGreen50,
+                                            border: Border.all(color: AppColors.primaryGreen, width: 0.5),
+                                          ),
+                                          child: Text(
+                                            'AI ACTIVE',
+                                            style: GoogleFonts.plusJakartaSans(
+                                              fontSize: 8,
+                                              fontWeight: FontWeight.w800,
+                                              color: AppColors.primaryGreen,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 7,
+                                        height: 7,
+                                        decoration: const BoxDecoration(
+                                          color: AppColors.accentGreen,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        isBn ? 'নাগরিক সেবা সহায়ক · সক্রিয়' : 'Civic Service Assistant · Online',
+                                        style: GoogleFonts.notoSansBengali(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.close, size: 20, color: AppColors.textSecondary),
+                            onPressed: () => Navigator.pop(modalContext),
+                          ),
+                        ],
                       ),
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 32,
-                              height: 32,
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: AppColors.darkGreen,
-                              ),
-                              child: SvgPicture.asset('assets/icons/jonobondhu.svg'),
-                            ),
-                            const SizedBox(width: 10),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  isBn ? 'জনবন্ধু AI (নাগরিক সহকারী)' : 'Jonobondhu AI (Assistant)',
-                                  style: GoogleFonts.notoSansBengali(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary,
+
+                    // Messages Scrollable List
+                    Expanded(
+                      child: ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _messages.length + (_isTyping ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          // Typing Indicator Bubble
+                          if (index == _messages.length && _isTyping) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Bot Avatar
+                                  Container(
+                                    width: 30,
+                                    height: 30,
+                                    margin: const EdgeInsets.only(right: 8, top: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: AppColors.border, width: 1),
+                                    ),
+                                    padding: const EdgeInsets.all(3),
+                                    child: SvgPicture.asset(
+                                      'assets/icons/jonobondhu.svg',
+                                      fit: BoxFit.contain,
+                                    ),
                                   ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.bgMuted,
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const SizedBox(
+                                          width: 12,
+                                          height: 12,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          isBn ? 'জনবন্ধু AI লিখছে...' : 'Jonobondhu AI is typing...',
+                                          style: GoogleFonts.notoSansBengali(
+                                            fontSize: 12,
+                                            color: AppColors.textSecondary,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          final msg = _messages[index];
+
+                          // User message: right aligned, green background
+                          if (msg.isUser) {
+                            return Align(
+                              alignment: Alignment.centerRight,
+                              child: Container(
+                                margin: const EdgeInsets.only(bottom: 12),
+                                constraints: BoxConstraints(
+                                  maxWidth: MediaQuery.of(context).size.width * 0.78,
                                 ),
-                                Row(
+                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryGreen,
+                                  border: Border.all(color: AppColors.primaryGreen),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.accentGreen,
-                                        shape: BoxShape.circle,
+                                    Text(
+                                      msg.text,
+                                      style: GoogleFonts.notoSansBengali(
+                                        fontSize: 13,
+                                        color: Colors.white,
+                                        height: 1.5,
                                       ),
                                     ),
-                                    const SizedBox(width: 4),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      isBn ? 'সার্বক্ষণিক সক্রিয়' : 'Online & Ready',
-                                      style: GoogleFonts.notoSansBengali(
-                                        fontSize: 11,
-                                        color: AppColors.textSecondary,
+                                      msg.time,
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 10,
+                                        color: Colors.white70,
                                       ),
                                     ),
                                   ],
                                 ),
+                              ),
+                            );
+                          }
+
+                          // AI message: left aligned with circular Jonobondhu logo avatar (matching website)
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Circular White Avatar next to AI message (Matching Website)
+                                Container(
+                                  width: 30,
+                                  height: 30,
+                                  margin: const EdgeInsets.only(right: 8, top: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: AppColors.border, width: 1),
+                                  ),
+                                  padding: const EdgeInsets.all(3),
+                                  child: SvgPicture.asset(
+                                    'assets/icons/jonobondhu.svg',
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Container(
+                                    constraints: BoxConstraints(
+                                      maxWidth: MediaQuery.of(context).size.width * 0.76,
+                                    ),
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.bgMuted,
+                                      border: Border.all(color: AppColors.border),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        SelectableText(
+                                          msg.text,
+                                          style: GoogleFonts.notoSansBengali(
+                                            fontSize: 13,
+                                            color: AppColors.textPrimary,
+                                            height: 1.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          msg.time,
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 10,
+                                            color: AppColors.textMuted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    // Quick Suggestion Chips
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Row(
+                        children: quickPrompts.map((prompt) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: InkWell(
+                              onTap: () {
+                                _sendMessage(prompt);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.bgPage,
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Text(
+                                  prompt,
+                                  style: GoogleFonts.notoSansBengali(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    // Input Box
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: const BoxDecoration(
+                        color: AppColors.bgSurface,
+                        border: Border(
+                          top: BorderSide(color: AppColors.border, width: 1),
+                        ),
+                      ),
+                      child: SafeArea(
+                        top: false,
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _inputController,
+                                style: GoogleFonts.notoSansBengali(fontSize: 13),
+                                decoration: InputDecoration(
+                                  hintText: isBn
+                                      ? 'যেকোনো সরকারি সেবা সম্পর্কে প্রশ্ন করুন...'
+                                      : 'Ask anything about citizen services...',
+                                  isDense: true,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: const OutlineInputBorder(
+                                    borderRadius: BorderRadius.zero,
+                                    borderSide: BorderSide(color: AppColors.border),
+                                  ),
+                                  focusedBorder: const OutlineInputBorder(
+                                    borderRadius: BorderRadius.zero,
+                                    borderSide: BorderSide(color: AppColors.primaryGreen, width: 1.5),
+                                  ),
+                                ),
+                                onSubmitted: (_) => _sendMessage(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              style: IconButton.styleFrom(
+                                backgroundColor: AppColors.primaryGreen,
+                                foregroundColor: Colors.white,
+                                shape: const RoundedRectangleBorder(),
+                              ),
+                              icon: const Icon(Icons.send, size: 16),
+                              onPressed: () => _sendMessage(),
                             ),
                           ],
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.close, color: AppColors.textPrimary, size: 20),
-                          onPressed: () => Navigator.pop(ctx),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Messages List
-                  Expanded(
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = _messages[index];
-                        return Align(
-                          alignment: msg.isUser ? Alignment.centerRight : Alignment.centerLeft,
-                          child: Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            constraints: BoxConstraints(
-                              maxWidth: MediaQuery.of(context).size.width * 0.78,
-                            ),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: msg.isUser ? AppColors.primaryGreen : AppColors.bgMuted,
-                              border: Border.all(
-                                color: msg.isUser ? AppColors.primaryGreen : AppColors.border,
-                              ),
-                            ),
-                            child: Column(
-                              crossAxisAlignment:
-                                  msg.isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  msg.text,
-                                  style: GoogleFonts.notoSansBengali(
-                                    fontSize: 13,
-                                    color: msg.isUser ? Colors.white : AppColors.textPrimary,
-                                    height: 1.5,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  msg.time,
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 10,
-                                    color: msg.isUser ? Colors.white70 : AppColors.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Quick Suggestion Chips
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    child: Row(
-                      children: quickPrompts.map((prompt) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: InkWell(
-                            onTap: () {
-                              _sendMessage(prompt);
-                              setModalState(() {});
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: AppColors.bgPage,
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Text(
-                                prompt,
-                                style: GoogleFonts.notoSansBengali(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primaryGreen,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
-
-                  // Input Box
-                  Container(
-                    padding: EdgeInsets.only(
-                      left: 12,
-                      right: 12,
-                      top: 8,
-                      bottom: MediaQuery.of(context).viewInsets.bottom + 12,
-                    ),
-                    decoration: const BoxDecoration(
-                      color: AppColors.bgSurface,
-                      border: Border(
-                        top: BorderSide(color: AppColors.border, width: 1),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _inputController,
-                            style: GoogleFonts.notoSansBengali(fontSize: 13),
-                            decoration: InputDecoration(
-                              hintText: isBn
-                                  ? 'যেকোনো সরকারি সেবা সম্পর্কে প্রশ্ন করুন...'
-                                  : 'Ask anything about citizen services...',
-                              isDense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            ),
-                            onSubmitted: (_) {
-                              _sendMessage();
-                              setModalState(() {});
-                            },
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          style: IconButton.styleFrom(
-                            backgroundColor: AppColors.primaryGreen,
-                            foregroundColor: Colors.white,
-                            shape: const RoundedRectangleBorder(),
-                          ),
-                          icon: const Icon(Icons.send, size: 16),
-                          onPressed: () {
-                            _sendMessage();
-                            setModalState(() {});
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             );
           },
         );
       },
-    );
+    ).whenComplete(() {
+      _modalSetState = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final langProvider = Provider.of<LanguageProvider>(context);
+    final isBn = langProvider.isBn;
 
     return Stack(
       children: [
         widget.child,
 
-        // Floating Movable Jonobondhu AI Bubble
+        // Floating Movable Jonobondhu AI Bubble (Styled 100% Identical to Website)
         Positioned(
           left: _x,
           top: _y,
           child: GestureDetector(
             onPanUpdate: (details) {
               setState(() {
-                _x = (_x + details.delta.dx).clamp(8.0, size.width - 66.0);
-                _y = (_y + details.delta.dy).clamp(60.0, size.height - 130.0);
+                _x = (_x + details.delta.dx).clamp(8.0, size.width - 72.0);
+                _y = (_y + details.delta.dy).clamp(60.0, size.height - 140.0);
               });
             },
             onPanEnd: (details) {
-              // Snap to nearest side (left or right)
+              // Snap to nearest side (left or right) keeping released vertical height
               setState(() {
-                if (_x + 28 < size.width / 2) {
+                if (_x + 30 < size.width / 2) {
                   _x = 12;
                 } else {
-                  _x = size.width - 66;
+                  _x = size.width - 72;
                 }
               });
             },
             onTap: _openChatDialog,
             child: Material(
-              elevation: 4,
               color: Colors.transparent,
-              child: Container(
-                width: 54,
-                height: 54,
-                decoration: BoxDecoration(
-                  color: AppColors.darkGreen,
-                  border: Border.all(color: Colors.white, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.18),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // Circular White Bubble with Bangladesh Green Border (Matches Website JonobondhuChat)
+                  Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.primaryGreen, width: 2.5),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.16),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                padding: const EdgeInsets.all(7),
-                child: SvgPicture.asset(
-                  'assets/icons/jonobondhu.svg',
-                  fit: BoxFit.contain,
-                ),
+                    padding: const EdgeInsets.all(8),
+                    child: SvgPicture.asset(
+                      'assets/icons/jonobondhu.svg',
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+
+                  // Active AI Indicator Dot
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 13,
+                      height: 13,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.accentGreen,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+
+                  // Tooltip badge pill
+                  Positioned(
+                    bottom: -6,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        color: AppColors.darkGreen,
+                        child: Text(
+                          isBn ? 'জনবন্ধু AI' : 'Jonobondhu',
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 8.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
