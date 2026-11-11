@@ -80,6 +80,8 @@ class Service {
   final List<String> importantNotesBn;
   final List<String> commonMistakesBn;
 
+  String get processingTimeEn => processingTimeBn;
+
   Service({
     required this.slug,
     required this.nameBn,
