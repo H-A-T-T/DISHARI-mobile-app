@@ -5,6 +5,7 @@ import '../config/constants.dart';
 import '../providers/language_provider.dart';
 import '../providers/services_provider.dart';
 import '../widgets/home/hero_section.dart';
+import '../widgets/home/ai_teaser.dart';
 import '../widgets/home/category_grid.dart';
 import '../widgets/home/featured_services.dart';
 import '../widgets/home/how_it_works.dart';
@@ -43,6 +44,10 @@ class HomeScreen extends StatelessWidget {
               onNavigateTab(1); // Navigate to Services tab
             },
           ),
+          const SizedBox(height: 8),
+
+          // Jonobondhu AI Citizen Assistant Banner Card
+          const AiTeaser(),
           const SizedBox(height: 8),
 
           // Categories Grid

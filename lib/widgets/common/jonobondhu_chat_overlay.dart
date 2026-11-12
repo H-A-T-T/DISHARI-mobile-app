@@ -29,6 +29,11 @@ class JonobondhuChatOverlay extends StatefulWidget {
     required this.child,
   });
 
+  /// Static method to open Jonobondhu AI chat from anywhere in the app
+  static void openChat(BuildContext context) {
+    _JonobondhuChatOverlayState.openChatFromContext(context);
+  }
+
   @override
   State<JonobondhuChatOverlay> createState() => _JonobondhuChatOverlayState();
 }
@@ -37,47 +42,53 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
   // Floating bubble position
   double _x = 0;
   double _y = 0;
-  bool _initialized = false;
 
   final TextEditingController _inputController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final List<ChatMessage> _messages = [];
+  static final List<ChatMessage> _sharedMessages = [];
 
   bool _isTyping = false;
   StateSetter? _modalSetState;
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (!_initialized) {
-      final size = MediaQuery.of(context).size;
-      // Position bottom-right by default matching web
-      _x = size.width - 76;
-      _y = size.height - 180;
-      _initialized = true;
+  static _JonobondhuChatOverlayState? _activeState;
 
-      _addWelcomeMessage();
+  @override
+  void initState() {
+    super.initState();
+    _activeState = this;
+    if (_sharedMessages.isEmpty) {
+      _initDefaultMessages();
     }
   }
 
-  void _addWelcomeMessage() {
-    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
-    final isBn = langProvider.isBn;
+  @override
+  void dispose() {
+    if (_activeState == this) {
+      _activeState = null;
+    }
+    _inputController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
-    _messages.clear();
-    _messages.add(
+  void _initDefaultMessages() {
+    final now = DateTime.now();
+    final hour = now.hour.toString().padLeft(2, '0');
+    final minute = now.minute.toString().padLeft(2, '0');
+    final timeStr = '$hour:$minute';
+
+    _sharedMessages.clear();
+    _sharedMessages.add(
       ChatMessage(
         id: 'welcome',
         isUser: false,
-        text: isBn
-            ? 'আসসালামু আলাইকুম ও স্বাগতম! আমি দিশারীর ‘জনবন্ধু AI’। সরকারি সেবা, প্রয়োজনীয় কাগজপত্র, ফি কিংবা আবেদন প্রক্রিয়া সম্পর্কে আমাকে যেকোনো প্রশ্ন করতে পারেন।'
-            : 'Welcome! I am Dishari\'s "Jonobondhu AI". Ask me anything regarding government services, required documentation, fees, or procedural steps.',
-        time: _currentTimeString(isBn),
+        text: 'আসসালামু আলাইকুম ও স্বাগতম! আমি দিশারীর ‘জনবন্ধু AI’। সরকারি সেবা, প্রয়োজনীয় কাগজপত্র, ফি কিংবা আবেদন প্রক্রিয়া সম্পর্কে আমাকে যেকোনো প্রশ্ন করতে পারেন।',
+        time: AppConstants.toBengaliNumber(timeStr),
       ),
     );
   }
 
-  String _currentTimeString(bool isBn) {
+  static String _currentTimeString(bool isBn) {
     final now = DateTime.now();
     final hour = now.hour.toString().padLeft(2, '0');
     final minute = now.minute.toString().padLeft(2, '0');
@@ -89,7 +100,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 80,
+          _scrollController.position.maxScrollExtent + 90,
           duration: const Duration(milliseconds: 250),
           curve: Curves.easeOut,
         );
@@ -114,7 +125,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     );
 
     setState(() {
-      _messages.add(userMsg);
+      _sharedMessages.add(userMsg);
       _isTyping = true;
     });
     if (_modalSetState != null) {
@@ -123,7 +134,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     _scrollToBottom();
 
     // Prepare recent history for AI context
-    final history = _messages
+    final history = _sharedMessages
         .where((m) => m.id != 'welcome')
         .map((m) => (isUser: m.isUser, text: m.text))
         .toList();
@@ -147,17 +158,17 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
 
       setState(() {
         _isTyping = false;
-        _messages.add(aiMsg);
+        _sharedMessages.add(aiMsg);
       });
       if (_modalSetState != null) {
         _modalSetState!(() {});
       }
       _scrollToBottom();
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
       setState(() {
         _isTyping = false;
-        _messages.add(
+        _sharedMessages.add(
           ChatMessage(
             id: 'ai-err-${DateTime.now().millisecondsSinceEpoch}',
             isUser: false,
@@ -171,6 +182,143 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
       }
       _scrollToBottom();
     }
+  }
+
+  static void openChatFromContext(BuildContext context) {
+    if (_activeState != null) {
+      _activeState!._openChatDialog();
+    } else {
+      // Fallback direct bottom sheet
+      _showDirectChatSheet(context);
+    }
+  }
+
+  static void _showDirectChatSheet(BuildContext context) {
+    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final isBn = langProvider.isBn;
+    final controller = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) {
+          final keyboardHeight = MediaQuery.of(modalCtx).viewInsets.bottom;
+          return Padding(
+            padding: EdgeInsets.only(bottom: keyboardHeight),
+            child: Container(
+              height: MediaQuery.of(modalCtx).size.height * 0.82,
+              decoration: const BoxDecoration(
+                color: AppColors.bgSurface,
+                border: Border(top: BorderSide(color: AppColors.primaryGreen, width: 3)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: const BoxDecoration(
+                      color: AppColors.bgSurface,
+                      border: Border(bottom: BorderSide(color: AppColors.border, width: 1)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.border, width: 1.5),
+                              ),
+                              padding: const EdgeInsets.all(4),
+                              child: SvgPicture.asset('assets/icons/jonobondhu.svg'),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(
+                              isBn ? 'জনবন্ধু AI (নাগরিক সহকারী)' : 'Jonobondhu AI (Assistant)',
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _sharedMessages.length,
+                      itemBuilder: (c, idx) {
+                        final m = _sharedMessages[idx];
+                        return Align(
+                          alignment: m.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: m.isUser ? AppColors.primaryGreen : AppColors.bgMuted,
+                              border: Border.all(color: m.isUser ? AppColors.primaryGreen : AppColors.border),
+                            ),
+                            child: Text(
+                              m.text,
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 13,
+                                color: m.isUser ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: controller,
+                            decoration: InputDecoration(
+                              hintText: isBn ? 'প্রশ্ন লিখুন...' : 'Ask question...',
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.send, color: AppColors.primaryGreen),
+                          onPressed: () async {
+                            final q = controller.text.trim();
+                            if (q.isEmpty) return;
+                            controller.clear();
+                            final time = _currentTimeString(isBn);
+                            _sharedMessages.add(ChatMessage(id: 'u-${DateTime.now().millisecondsSinceEpoch}', isUser: true, text: q, time: time));
+                            setModalState(() {});
+                            final reply = await AgentService.getReply(prompt: q, isBn: isBn);
+                            _sharedMessages.add(ChatMessage(id: 'a-${DateTime.now().millisecondsSinceEpoch}', isUser: false, text: reply, time: _currentTimeString(isBn)));
+                            setModalState(() {});
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _openChatDialog() {
@@ -326,10 +474,10 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                       child: ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
-                        itemCount: _messages.length + (_isTyping ? 1 : 0),
+                        itemCount: _sharedMessages.length + (_isTyping ? 1 : 0),
                         itemBuilder: (context, index) {
                           // Typing Indicator Bubble
-                          if (index == _messages.length && _isTyping) {
+                          if (index == _sharedMessages.length && _isTyping) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
                               child: Row(
@@ -385,7 +533,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                             );
                           }
 
-                          final msg = _messages[index];
+                          final msg = _sharedMessages[index];
 
                           // User message: right aligned, green background
                           if (msg.isUser) {
@@ -588,7 +736,20 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     final langProvider = Provider.of<LanguageProvider>(context);
     final isBn = langProvider.isBn;
 
+    // Guaranteed on-screen safety calculation (fixes off-screen positioning bug)
+    final double screenW = size.width > 50 ? size.width : 390.0;
+    final double screenH = size.height > 100 ? size.height : 800.0;
+
+    // Always keep bubble strictly within visible bounds
+    if (_x <= 0 || _x > screenW - 64) {
+      _x = screenW - 74.0;
+    }
+    if (_y <= 0 || _y > screenH - 120) {
+      _y = screenH - 170.0;
+    }
+
     return Stack(
+      clipBehavior: Clip.none,
       children: [
         widget.child,
 
@@ -597,19 +758,20 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
           left: _x,
           top: _y,
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onPanUpdate: (details) {
               setState(() {
-                _x = (_x + details.delta.dx).clamp(8.0, size.width - 72.0);
-                _y = (_y + details.delta.dy).clamp(60.0, size.height - 140.0);
+                _x = (_x + details.delta.dx).clamp(10.0, screenW - 70.0);
+                _y = (_y + details.delta.dy).clamp(60.0, screenH - 130.0);
               });
             },
             onPanEnd: (details) {
               // Snap to nearest side (left or right) keeping released vertical height
               setState(() {
-                if (_x + 30 < size.width / 2) {
+                if (_x + 30 < screenW / 2) {
                   _x = 12;
                 } else {
-                  _x = size.width - 72;
+                  _x = screenW - 74;
                 }
               });
             },
@@ -629,9 +791,9 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                       border: Border.all(color: AppColors.primaryGreen, width: 2.5),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.16),
+                          color: Colors.black.withValues(alpha: 0.22),
                           blurRadius: 10,
-                          offset: const Offset(0, 3),
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
