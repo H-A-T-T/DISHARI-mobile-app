@@ -1,0 +1,34 @@
+[
+  {
+    "text": "National ID Bangladesh NID Name Date of Birth NID Number Father Mother Address",
+    "type": "National ID"
+  },
+  {
+    "text": "Bangladesh National Identity Card NID Citizen Name Date of Birth National ID Number Address",
+    "type": "National ID"
+  },
+  {
+    "text": "Birth Certificate Registration Number Name Date of Birth Father Mother Bangladesh",
+    "type": "Birth Certificate"
+  },
+  {
+    "text": "Birth Registration Certificate Bangladesh Registration Number Child Name Date of Birth Father Mother",
+    "type": "Birth Certificate"
+  },
+  {
+    "text": "Passport People's Republic of Bangladesh Passport Number Nationality Date of Birth Name",
+    "type": "Passport"
+  },
+  {
+    "text": "Bangladesh Passport Passport Number Surname Given Name Nationality Date of Birth",
+    "type": "Passport"
+  },
+  {
+    "text": "Academic Certificate University Student Name Roll Registration CGPA Degree",
+    "type": "Academic Certificate"
+  },
+  {
+    "text": "University Transcript Student Roll Number Registration Degree Examination Result CGPA",
+    "type": "Academic Certificate"
+  }
+]

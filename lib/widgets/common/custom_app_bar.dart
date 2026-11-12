@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../config/constants.dart';
 import '../../providers/language_provider.dart';
 import 'dishari_logo.dart';
-import 'jonobondhu_chat_overlay.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   final VoidCallback? onNotificationTap;
@@ -63,52 +61,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Jonobondhu AI Quick Access Button
-                    InkWell(
-                      onTap: () => JonobondhuChatOverlay.openChat(context),
-                      borderRadius: BorderRadius.zero,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(color: AppColors.primaryGreen, width: 1.5),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 17,
-                              height: 17,
-                              child: SvgPicture.asset(
-                                'assets/icons/jonobondhu.svg',
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              'AI',
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                color: AppColors.primaryGreen,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-
                     // Helpline 333 Button
                     InkWell(
                       onTap: _callHelpline,
                       borderRadius: BorderRadius.zero,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppColors.lightGreen50,
                           border: Border.all(
-                            color: AppColors.primaryGreen.withValues(alpha: 0.3),
+                            color:
+                                AppColors.primaryGreen.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Row(
@@ -138,7 +102,8 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                       onTap: () => langProvider.toggleLanguage(),
                       borderRadius: BorderRadius.zero,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
                           color: AppColors.bgMuted,
                           border: Border.all(color: AppColors.border),
