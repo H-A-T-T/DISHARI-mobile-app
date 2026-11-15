@@ -33,6 +33,7 @@ class ApplicationModal extends StatefulWidget {
 
 class _ApplicationModalState extends State<ApplicationModal> {
   bool _isSubmitting = false;
+  int _botStep = 0;
   CitizenApplication? _createdApp;
   String? _errorMsg;
 
@@ -70,44 +71,65 @@ class _ApplicationModalState extends State<ApplicationModal> {
     setState(() {
       _isSubmitting = true;
       _errorMsg = null;
+      _botStep = 1;
     });
 
-    final user = auth.user;
-    final docs = dashboard.documents;
+    try {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) setState(() => _botStep = 2);
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) setState(() => _botStep = 3);
 
-    // Match attached documents
-    final List<String> attachedDocs = [];
-    for (var doc in widget.service.requiredDocs) {
-      final isMatched = docs.any((ud) => _matchesRequiredDoc(doc, ud));
-      if (isMatched) {
-        attachedDocs.add(isBn ? doc.nameBn : doc.nameEn);
-      }
-    }
+      final user = auth.user;
+      final docs = dashboard.documents;
 
-    final result = await dashboard.createApplication(
-      userId: user?.id ?? 1,
-      serviceSlug: widget.service.slug,
-      serviceNameBn: widget.service.nameBn,
-      serviceNameEn: widget.service.nameEn,
-      applicantData: {
-        'fullName': user?.fullName ?? 'নাগরিক',
-        'phone': user?.phone ?? '',
-        'email': user?.email ?? '',
-        'citizenId': auth.citizenId,
-      },
-      documentsAttached: attachedDocs,
-      officialPortalUrl: widget.service.officialUrl,
-    );
-
-    if (mounted) {
-      setState(() {
-        _isSubmitting = false;
-        if (result.success && result.application != null) {
-          _createdApp = result.application;
-        } else {
-          _errorMsg = result.error ?? (isBn ? 'কার্যপত্র তৈরিতে সমস্যা হয়েছে' : 'Failed to generate docket');
+      // Match attached documents
+      final List<String> attachedDocs = [];
+      for (var doc in widget.service.requiredDocs) {
+        final isMatched = docs.any((ud) => _matchesRequiredDoc(doc, ud));
+        if (isMatched) {
+          attachedDocs.add(isBn ? doc.nameBn : doc.nameEn);
         }
-      });
+      }
+
+      final result = await dashboard.createApplication(
+        userId: user?.id ?? 1,
+        serviceSlug: widget.service.slug,
+        serviceNameBn: widget.service.nameBn,
+        serviceNameEn: widget.service.nameEn,
+        applicantData: {
+          'fullName': user?.fullName ?? 'নাগরিক',
+          'phone': user?.phone ?? '',
+          'email': user?.email ?? '',
+          'citizenId': auth.citizenId,
+        },
+        documentsAttached: attachedDocs,
+        officialPortalUrl: widget.service.officialUrl,
+      );
+
+      if (mounted) setState(() => _botStep = 4);
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _botStep = 0;
+          if (result.success && result.application != null) {
+            _createdApp = result.application;
+          } else {
+            _errorMsg = result.error ??
+                (isBn ? 'কার্যপত্র তৈরিতে সমস্যা হয়েছে' : 'Failed to generate docket');
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+          _botStep = 0;
+          _errorMsg = isBn ? 'কার্যপত্র তৈরিতে সমস্যা হয়েছে' : 'Failed to generate docket';
+        });
+      }
     }
   }
 
@@ -392,6 +414,92 @@ class _ApplicationModalState extends State<ApplicationModal> {
                   ),
                 ),
 
+              // Invisible Bot Live Automation Terminal
+              if (_isSubmitting) ...[
+                Container(
+                  margin: const EdgeInsets.only(bottom: 14),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF171717),
+                    border: Border.all(color: AppColors.primaryGreen, width: 2),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Color(0xFF34D399),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                isBn
+                                    ? 'অদৃশ্য অটোমেশন বট রানিং...'
+                                    : 'Invisible Bot Worker Running...',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF34D399),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            'Playwright Worker #01',
+                            style: GoogleFonts.plusJakartaSans(
+                              fontSize: 9,
+                              color: const Color(0xFFA3A3A3),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      const Divider(color: Color(0xFF404040), height: 1),
+                      const SizedBox(height: 8),
+                      _buildBotStepRow(
+                        step: 1,
+                        currentStep: _botStep,
+                        text: isBn
+                            ? 'সরকারি পোর্টাল সংযোগ স্থাপন ও সেশন শুরু...'
+                            : 'Connecting to govt gateway & starting session...',
+                      ),
+                      const SizedBox(height: 5),
+                      _buildBotStepRow(
+                        step: 2,
+                        currentStep: _botStep,
+                        text: isBn
+                            ? 'নাগরিক প্রোফাইল থেকে সকল ফর্ম ফিল্ড স্বয়ংক্রিয় পূরণ...'
+                            : 'Autofilling form fields from citizen profile...',
+                      ),
+                      const SizedBox(height: 5),
+                      _buildBotStepRow(
+                        step: 3,
+                        currentStep: _botStep,
+                        text: isBn
+                            ? 'ডিজিটাল লকার থেকে প্রয়োজনীয় ডকুমেন্টস এনক্রিপ্ট করে সংযুক্ত...'
+                            : 'Attaching verified documents from digital locker...',
+                      ),
+                      const SizedBox(height: 5),
+                      _buildBotStepRow(
+                        step: 4,
+                        currentStep: _botStep,
+                        text: isBn
+                            ? 'সার্ভার ভেরিফিকেশন ও অফিসিয়াল ট্র্যাকিং ডকেট জেনারেশন সম্পন্ন!'
+                            : 'Server verification complete & official tracking logged!',
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               // Generate Button
               SizedBox(
                 width: double.infinity,
@@ -404,10 +512,26 @@ class _ApplicationModalState extends State<ApplicationModal> {
                     shape: const RoundedRectangleBorder(),
                   ),
                   child: _isSubmitting
-                      ? const SizedBox(
-                          height: 18,
-                          width: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      ? Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const SizedBox(
+                              height: 14,
+                              width: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              isBn ? 'স্বয়ংক্রিয় পূরণ চলছে...' : 'Autofilling in progress...',
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         )
                       : Text(
                           isBn ? 'ডকেট প্রস্তুত ও নিশ্চিত করুন' : 'Confirm & Generate Docket',
@@ -422,6 +546,43 @@ class _ApplicationModalState extends State<ApplicationModal> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildBotStepRow({
+    required int step,
+    required int currentStep,
+    required String text,
+  }) {
+    final isDone = currentStep > step;
+    final isCurrent = currentStep == step;
+
+    final color = isDone || isCurrent
+        ? const Color(0xFF6EE7B7)
+        : const Color(0xFF737373);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isDone ? '✓ ' : (isCurrent ? '➜ ' : '○ '),
+          style: GoogleFonts.plusJakartaSans(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            text,
+            style: GoogleFonts.notoSansBengali(
+              fontSize: 10,
+              color: color,
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -5,7 +5,10 @@ import 'package:provider/provider.dart';
 import '../../config/constants.dart';
 import '../../config/env.dart';
 import '../../providers/language_provider.dart';
+import '../../screens/opportunities_screen.dart';
+import '../../screens/service_detail_screen.dart';
 import '../../services/agent_service.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class ChatMessage {
   final String id;
@@ -23,13 +26,15 @@ class ChatMessage {
 
 class JonobondhuChatOverlay extends StatefulWidget {
   final Widget child;
+  final void Function(int tabIndex)? onNavigateTab;
 
   const JonobondhuChatOverlay({
     super.key,
     required this.child,
+    this.onNavigateTab,
   });
 
-  /// Static method to open Jonobondhu AI chat from anywhere in the app
+  /// অ্যাপের যেকোনো জায়গা থেকে জনবন্ধু AI চ্যাট খোলার স্ট্যাটিক মেথড
   static void openChat(BuildContext context) {
     _JonobondhuChatOverlayState.openChatFromContext(context);
   }
@@ -39,7 +44,7 @@ class JonobondhuChatOverlay extends StatefulWidget {
 }
 
 class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
-  // Floating bubble position
+  // ভাসমান বাবলের অবস্থান
   double _x = 0;
   double _y = 0;
 
@@ -50,15 +55,130 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
   bool _isTyping = false;
   StateSetter? _modalSetState;
 
+  // ভয়েস ইনপুট
+  final stt.SpeechToText _speech = stt.SpeechToText();
+  bool _isListening = false;
+
   static _JonobondhuChatOverlayState? _activeState;
+  static void Function(int tabIndex)? globalNavigateTab;
 
   @override
   void initState() {
     super.initState();
     _activeState = this;
+    globalNavigateTab = widget.onNavigateTab;
     if (_sharedMessages.isEmpty) {
       _initDefaultMessages();
     }
+  }
+
+  @override
+  void didUpdateWidget(covariant JonobondhuChatOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.onNavigateTab != null) {
+      globalNavigateTab = widget.onNavigateTab;
+    }
+  }
+
+  static void navigateFromAction(BuildContext context, String type, String target) {
+    // Dismiss chat sheet or dialog
+    Navigator.of(context, rootNavigator: true).pop();
+
+    if (type == 'tab') {
+      final tabIdx = int.tryParse(target) ?? 0;
+      globalNavigateTab?.call(tabIdx);
+    } else if (type == 'service') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ServiceDetailScreen(slug: target),
+        ),
+      );
+    } else if (type == 'screen') {
+      if (target == 'opportunities') {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const OpportunitiesScreen(),
+          ),
+        );
+      }
+    }
+  }
+
+  static Widget buildAiMessageContent(BuildContext context, String rawText, String time) {
+    final regExp = RegExp(r'\[ACTION:([^:]+):([^:]+):([^\]]+)\]');
+    final match = regExp.firstMatch(rawText);
+
+    String cleanText = rawText;
+    String? actionType;
+    String? actionTarget;
+    String? actionLabel;
+
+    if (match != null) {
+      cleanText = rawText.replaceAll(match.group(0)!, '').trim();
+      actionType = match.group(1);
+      actionTarget = match.group(2);
+      actionLabel = match.group(3);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SelectableText(
+          cleanText,
+          style: GoogleFonts.notoSansBengali(
+            fontSize: 13,
+            color: AppColors.textPrimary,
+            height: 1.5,
+          ),
+        ),
+        if (actionType != null && actionTarget != null && actionLabel != null) ...[
+          const SizedBox(height: 8),
+          InkWell(
+            onTap: () => navigateFromAction(
+              context,
+              actionType!,
+              actionTarget!,
+            ),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.primaryGreen,
+                border: Border.all(color: AppColors.darkGreen),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    actionLabel,
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Icon(
+                    Icons.arrow_forward,
+                    size: 13,
+                    color: Colors.white,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+        if (time.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          Text(
+            time,
+            style: GoogleFonts.plusJakartaSans(
+              fontSize: 10,
+              color: AppColors.textMuted,
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   @override
@@ -66,6 +186,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     if (_activeState == this) {
       _activeState = null;
     }
+    _speech.cancel();
     _inputController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -82,7 +203,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
       ChatMessage(
         id: 'welcome',
         isUser: false,
-        text: 'আসসালামু আলাইকুম ও স্বাগতম! আমি দিশারীর ‘জনবন্ধু AI’। সরকারি সেবা, প্রয়োজনীয় কাগজপত্র, ফি কিংবা আবেদন প্রক্রিয়া সম্পর্কে আমাকে যেকোনো প্রশ্ন করতে পারেন।',
+        text:
+            'আসসালামু আলাইকুম ও স্বাগতম! আমি দিশারীর ‘জনবন্ধু AI’। সরকারি সেবা, প্রয়োজনীয় কাগজপত্র, ফি কিংবা আবেদন প্রক্রিয়া সম্পর্কে আমাকে যেকোনো প্রশ্ন করতে পারেন।',
         time: AppConstants.toBengaliNumber(timeStr),
       ),
     );
@@ -108,10 +230,115 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     });
   }
 
+  /// মডাল ও মূল উইজেট—দুটোকেই রিফ্রেশ করার সহায়ক মেথড
+  void _refreshUi() {
+    if (mounted) setState(() {});
+    if (_modalSetState != null) {
+      _modalSetState!(() {});
+    }
+  }
+
+  /// ডিভাইসে সমর্থিত সঠিক বাংলা/ইংরেজি locale ID খুঁজে বের করে
+  Future<String> _resolveLocaleId(bool isBn) async {
+    if (!isBn) return 'en_US';
+
+    try {
+      final locales = await _speech.locales();
+      String norm(String s) => s.toLowerCase().replaceAll('-', '_');
+
+      // প্রথমে bn_BD খুঁজি
+      for (final l in locales) {
+        if (norm(l.localeId) == 'bn_bd') return l.localeId;
+      }
+      // না পেলে যেকোনো বাংলা locale
+      for (final l in locales) {
+        if (norm(l.localeId).startsWith('bn')) return l.localeId;
+      }
+    } catch (_) {}
+
+    // বাংলা সমর্থিত না হলে ইংরেজিতে ফিরে যাই
+    return 'en_US';
+  }
+
+  Future<void> _toggleVoiceInput() async {
+    if (!_isListening) {
+      final langProvider =
+          Provider.of<LanguageProvider>(context, listen: false);
+      final isBn = langProvider.isBn;
+
+      final available = await _speech.initialize(
+        onStatus: (status) {
+          if (status == 'done' || status == 'notListening') {
+            if (mounted) {
+              _isListening = false;
+              _refreshUi();
+            }
+          }
+        },
+        onError: (error) {
+          if (mounted) {
+            _isListening = false;
+            _refreshUi();
+          }
+        },
+      );
+
+      if (!available) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isBn
+                    ? 'মাইক্রোফোন ব্যবহারের অনুমতি দিন অথবা ভয়েস সেবা চালু করুন।'
+                    : 'Please allow microphone access or enable the speech service.',
+                style: GoogleFonts.notoSansBengali(fontSize: 12),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      final localeId = await _resolveLocaleId(isBn);
+
+      _isListening = true;
+      _refreshUi();
+
+      await _speech.listen(
+        localeId: localeId,
+        onResult: (result) {
+          if (!mounted) return;
+
+          _inputController.text = result.recognizedWords;
+          _inputController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _inputController.text.length),
+          );
+          _isListening = !result.finalResult;
+
+          _refreshUi();
+        },
+      );
+    } else {
+      await _speech.stop();
+      if (mounted) {
+        _isListening = false;
+        _refreshUi();
+      }
+    }
+  }
+
   Future<void> _sendMessage([String? customText]) async {
+    // শোনা চলাকালীন পাঠালে আগে মাইক বন্ধ করি
+    if (_isListening) {
+      await _speech.stop();
+      _isListening = false;
+      _refreshUi();
+    }
+
     final text = (customText ?? _inputController.text).trim();
     if (text.isEmpty) return;
 
+    if (!mounted) return;
     final langProvider = Provider.of<LanguageProvider>(context, listen: false);
     final isBn = langProvider.isBn;
 
@@ -133,13 +360,13 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     }
     _scrollToBottom();
 
-    // Prepare recent history for AI context
+    // AI-এর জন্য সাম্প্রতিক কথোপকথন
     final history = _sharedMessages
         .where((m) => m.id != 'welcome')
         .map((m) => (isUser: m.isUser, text: m.text))
         .toList();
 
-    // Call AgentService (reads GEMINI_API_KEY / OPENAI_API_KEY from .env, or falls back to civic catalog)
+    // AgentService কল (.env থেকে GEMINI_API_KEY / OPENAI_API_KEY, না থাকলে লোকাল ক্যাটালগ)
     try {
       final reply = await AgentService.getReply(
         prompt: text,
@@ -188,7 +415,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     if (_activeState != null) {
       _activeState!._openChatDialog();
     } else {
-      // Fallback direct bottom sheet
+      // বিকল্প: সরাসরি বটম শিট
       _showDirectChatSheet(context);
     }
   }
@@ -211,15 +438,19 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
               height: MediaQuery.of(modalCtx).size.height * 0.82,
               decoration: const BoxDecoration(
                 color: AppColors.bgSurface,
-                border: Border(top: BorderSide(color: AppColors.primaryGreen, width: 3)),
+                border: Border(
+                    top: BorderSide(color: AppColors.primaryGreen, width: 3)),
               ),
               child: Column(
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     decoration: const BoxDecoration(
                       color: AppColors.bgSurface,
-                      border: Border(bottom: BorderSide(color: AppColors.border, width: 1)),
+                      border: Border(
+                          bottom:
+                              BorderSide(color: AppColors.border, width: 1)),
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -232,14 +463,18 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                               decoration: BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.border, width: 1.5),
+                                border: Border.all(
+                                    color: AppColors.border, width: 1.5),
                               ),
                               padding: const EdgeInsets.all(4),
-                              child: SvgPicture.asset('assets/icons/jonobondhu.svg'),
+                              child: SvgPicture.asset(
+                                  'assets/icons/jonobondhu.svg'),
                             ),
                             const SizedBox(width: 10),
                             Text(
-                              isBn ? 'জনবন্ধু AI (নাগরিক সহকারী)' : 'Jonobondhu AI (Assistant)',
+                              isBn
+                                  ? 'জনবন্ধু AI (নাগরিক সহকারী)'
+                                  : 'Jonobondhu AI (Assistant)',
                               style: GoogleFonts.notoSansBengali(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w700,
@@ -262,50 +497,76 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                       itemBuilder: (c, idx) {
                         final m = _sharedMessages[idx];
                         return Align(
-                          alignment: m.isUser ? Alignment.centerRight : Alignment.centerLeft,
+                          alignment: m.isUser
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 10),
                             decoration: BoxDecoration(
-                              color: m.isUser ? AppColors.primaryGreen : AppColors.bgMuted,
-                              border: Border.all(color: m.isUser ? AppColors.primaryGreen : AppColors.border),
+                              color: m.isUser
+                                  ? AppColors.primaryGreen
+                                  : AppColors.bgMuted,
+                              border: Border.all(
+                                  color: m.isUser
+                                      ? AppColors.primaryGreen
+                                      : AppColors.border),
                             ),
-                            child: Text(
-                              m.text,
-                              style: GoogleFonts.notoSansBengali(
-                                fontSize: 13,
-                                color: m.isUser ? Colors.white : AppColors.textPrimary,
-                              ),
-                            ),
+                            child: m.isUser
+                                ? Text(
+                                    m.text,
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 13,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : buildAiMessageContent(
+                                    modalCtx,
+                                    m.text,
+                                    m.time,
+                                  ),
                           ),
                         );
                       },
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Row(
                       children: [
                         Expanded(
                           child: TextField(
                             controller: controller,
                             decoration: InputDecoration(
-                              hintText: isBn ? 'প্রশ্ন লিখুন...' : 'Ask question...',
+                              hintText:
+                                  isBn ? 'প্রশ্ন লিখুন...' : 'Ask question...',
                               isDense: true,
                             ),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.send, color: AppColors.primaryGreen),
+                          icon: const Icon(Icons.send,
+                              color: AppColors.primaryGreen),
                           onPressed: () async {
                             final q = controller.text.trim();
                             if (q.isEmpty) return;
                             controller.clear();
                             final time = _currentTimeString(isBn);
-                            _sharedMessages.add(ChatMessage(id: 'u-${DateTime.now().millisecondsSinceEpoch}', isUser: true, text: q, time: time));
+                            _sharedMessages.add(ChatMessage(
+                                id: 'u-${DateTime.now().millisecondsSinceEpoch}',
+                                isUser: true,
+                                text: q,
+                                time: time));
                             setModalState(() {});
-                            final reply = await AgentService.getReply(prompt: q, isBn: isBn);
-                            _sharedMessages.add(ChatMessage(id: 'a-${DateTime.now().millisecondsSinceEpoch}', isUser: false, text: reply, time: _currentTimeString(isBn)));
+                            final reply = await AgentService.getReply(
+                                prompt: q, isBn: isBn);
+                            _sharedMessages.add(ChatMessage(
+                                id: 'a-${DateTime.now().millisecondsSinceEpoch}',
+                                isUser: false,
+                                text: reply,
+                                time: _currentTimeString(isBn)));
                             setModalState(() {});
                           },
                         ),
@@ -327,20 +588,20 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
 
     final quickPrompts = isBn
         ? [
-            'পাসপোর্ট করতে কী কাগজপত্র লাগে?',
-            'অনলাইনে জন্ম নিবন্ধন যাচাই কীভাবে করব?',
-            'NID সংশোধন প্রক্রিয়ায় কত ফি লাগে?',
-            'বয়স্ক ভাতার যোগ্যতার নিয়ম কী?',
-            'ই-নামজারিতে মোট কত টাকা খরচ হয়?',
-            'ই-ট্রেড লাইসেন্স করতে কী লাগে?',
+            'বাবার মৃত্যুর পর জমির নামজারি করার নিয়ম কী?',
+            'বিধবা ভাতার জন্য কোনো দালাল বা ফি লাগবে কি?',
+            'ডিগ্রী পাস বেকারদের সরকারি যুব প্রশিক্ষণ ও ঋণ কীভাবে পাব?',
+            'ই-পাসপোর্টের প্রয়োজনীয় কাগজ ও সরকারি ফি কত?',
+            'উপবৃত্তি পাওয়ার অনলাইন আবেদন প্রক্রিয়া কী?',
+            'পাসপোর্ট আবেদনে ইনভ্যালিড দেখালে কী করব?',
           ]
         : [
-            'Documents required for passport?',
-            'How to verify birth registration?',
-            'Fee required for NID correction?',
-            'Eligibility for old-age allowance?',
-            'How much does e-Namjari cost?',
-            'Documents needed for Trade License?',
+            'How to apply for land mutation after father’s death?',
+            'Is there any fee or middleman for Widow Allowance?',
+            'Govt youth skill training & loans for graduates?',
+            'Documents and official fee for E-Passport?',
+            'Online application process for student stipend?',
+            'What to do if passport application shows invalid?',
           ];
 
     showModalBottomSheet(
@@ -352,7 +613,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
           builder: (modalContext, setModalState) {
             _modalSetState = setModalState;
 
-            final keyboardHeight = MediaQuery.of(modalContext).viewInsets.bottom;
+            final keyboardHeight =
+                MediaQuery.of(modalContext).viewInsets.bottom;
             final sheetHeight = MediaQuery.of(modalContext).size.height * 0.82;
 
             return Padding(
@@ -367,9 +629,10 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                 ),
                 child: Column(
                   children: [
-                    // Chat Title Bar - Styled to match web JonobondhuChat exactly
+                    // চ্যাট টাইটেল বার
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
                       decoration: const BoxDecoration(
                         color: AppColors.bgSurface,
                         border: Border(
@@ -381,17 +644,18 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                         children: [
                           Row(
                             children: [
-                              // Circular White Avatar matching website Jonobondhu AI
                               Container(
                                 width: 36,
                                 height: 36,
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: AppColors.border, width: 1.5),
+                                  border: Border.all(
+                                      color: AppColors.border, width: 1.5),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.black.withValues(alpha: 0.05),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.05),
                                       blurRadius: 4,
                                       offset: const Offset(0, 1),
                                     ),
@@ -420,10 +684,13 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                       if (EnvConfig.hasAiConfigured) ...[
                                         const SizedBox(width: 6),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 5, vertical: 1),
                                           decoration: BoxDecoration(
                                             color: AppColors.lightGreen50,
-                                            border: Border.all(color: AppColors.primaryGreen, width: 0.5),
+                                            border: Border.all(
+                                                color: AppColors.primaryGreen,
+                                                width: 0.5),
                                           ),
                                           child: Text(
                                             'AI ACTIVE',
@@ -449,7 +716,9 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                       ),
                                       const SizedBox(width: 5),
                                       Text(
-                                        isBn ? 'নাগরিক সেবা সহায়ক · সক্রিয়' : 'Civic Service Assistant · Online',
+                                        isBn
+                                            ? 'নাগরিক সেবা সহায়ক · সক্রিয়'
+                                            : 'Civic Service Assistant · Online',
                                         style: GoogleFonts.notoSansBengali(
                                           fontSize: 11,
                                           color: AppColors.textSecondary,
@@ -462,36 +731,42 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                             ],
                           ),
                           IconButton(
-                            icon: const Icon(Icons.close, size: 20, color: AppColors.textSecondary),
-                            onPressed: () => Navigator.pop(modalContext),
+                            icon: const Icon(Icons.close,
+                                size: 20, color: AppColors.textSecondary),
+                            onPressed: () {
+                              _speech.stop();
+                              _isListening = false;
+                              Navigator.pop(modalContext);
+                            },
                           ),
                         ],
                       ),
                     ),
 
-                    // Messages Scrollable List
+                    // মেসেজ তালিকা
                     Expanded(
                       child: ListView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.all(16),
                         itemCount: _sharedMessages.length + (_isTyping ? 1 : 0),
                         itemBuilder: (context, index) {
-                          // Typing Indicator Bubble
+                          // টাইপিং ইন্ডিকেটর
                           if (index == _sharedMessages.length && _isTyping) {
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Bot Avatar
                                   Container(
                                     width: 30,
                                     height: 30,
-                                    margin: const EdgeInsets.only(right: 8, top: 2),
+                                    margin:
+                                        const EdgeInsets.only(right: 8, top: 2),
                                     decoration: BoxDecoration(
                                       color: Colors.white,
                                       shape: BoxShape.circle,
-                                      border: Border.all(color: AppColors.border, width: 1),
+                                      border: Border.all(
+                                          color: AppColors.border, width: 1),
                                     ),
                                     padding: const EdgeInsets.all(3),
                                     child: SvgPicture.asset(
@@ -500,10 +775,12 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                     ),
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 10),
                                     decoration: BoxDecoration(
                                       color: AppColors.bgMuted,
-                                      border: Border.all(color: AppColors.border),
+                                      border:
+                                          Border.all(color: AppColors.border),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -513,12 +790,16 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                           height: 12,
                                           child: CircularProgressIndicator(
                                             strokeWidth: 2,
-                                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                    AppColors.primaryGreen),
                                           ),
                                         ),
                                         const SizedBox(width: 8),
                                         Text(
-                                          isBn ? 'জনবন্ধু AI লিখছে...' : 'Jonobondhu AI is typing...',
+                                          isBn
+                                              ? 'জনবন্ধু AI লিখছে...'
+                                              : 'Jonobondhu AI is typing...',
                                           style: GoogleFonts.notoSansBengali(
                                             fontSize: 12,
                                             color: AppColors.textSecondary,
@@ -535,19 +816,22 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
 
                           final msg = _sharedMessages[index];
 
-                          // User message: right aligned, green background
+                          // ইউজার মেসেজ: ডানে, সবুজ ব্যাকগ্রাউন্ড
                           if (msg.isUser) {
                             return Align(
                               alignment: Alignment.centerRight,
                               child: Container(
                                 margin: const EdgeInsets.only(bottom: 12),
                                 constraints: BoxConstraints(
-                                  maxWidth: MediaQuery.of(context).size.width * 0.78,
+                                  maxWidth:
+                                      MediaQuery.of(context).size.width * 0.78,
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 14, vertical: 10),
                                 decoration: BoxDecoration(
                                   color: AppColors.primaryGreen,
-                                  border: Border.all(color: AppColors.primaryGreen),
+                                  border:
+                                      Border.all(color: AppColors.primaryGreen),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -574,21 +858,22 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                             );
                           }
 
-                          // AI message: left aligned with circular Jonobondhu logo avatar (matching website)
+                          // AI মেসেজ: বামে, গোল লোগো অ্যাভাটারসহ
                           return Padding(
                             padding: const EdgeInsets.only(bottom: 12),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                // Circular White Avatar next to AI message (Matching Website)
                                 Container(
                                   width: 30,
                                   height: 30,
-                                  margin: const EdgeInsets.only(right: 8, top: 2),
+                                  margin:
+                                      const EdgeInsets.only(right: 8, top: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
                                     shape: BoxShape.circle,
-                                    border: Border.all(color: AppColors.border, width: 1),
+                                    border: Border.all(
+                                        color: AppColors.border, width: 1),
                                   ),
                                   padding: const EdgeInsets.all(3),
                                   child: SvgPicture.asset(
@@ -599,33 +884,21 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 Expanded(
                                   child: Container(
                                     constraints: BoxConstraints(
-                                      maxWidth: MediaQuery.of(context).size.width * 0.76,
+                                      maxWidth:
+                                          MediaQuery.of(context).size.width *
+                                              0.76,
                                     ),
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 14, vertical: 10),
                                     decoration: BoxDecoration(
                                       color: AppColors.bgMuted,
-                                      border: Border.all(color: AppColors.border),
+                                      border:
+                                          Border.all(color: AppColors.border),
                                     ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        SelectableText(
-                                          msg.text,
-                                          style: GoogleFonts.notoSansBengali(
-                                            fontSize: 13,
-                                            color: AppColors.textPrimary,
-                                            height: 1.5,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          msg.time,
-                                          style: GoogleFonts.plusJakartaSans(
-                                            fontSize: 10,
-                                            color: AppColors.textMuted,
-                                          ),
-                                        ),
-                                      ],
+                                    child: buildAiMessageContent(
+                                      context,
+                                      msg.text,
+                                      msg.time,
                                     ),
                                   ),
                                 ),
@@ -636,10 +909,11 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                       ),
                     ),
 
-                    // Quick Suggestion Chips
+                    // দ্রুত প্রশ্নের চিপ
                     SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 6),
                       child: Row(
                         children: quickPrompts.map((prompt) {
                           return Padding(
@@ -649,7 +923,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 _sendMessage(prompt);
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: AppColors.bgPage,
                                   border: Border.all(color: AppColors.border),
@@ -669,9 +944,10 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                       ),
                     ),
 
-                    // Input Box
+                    // ইনপুট বক্স (সার্চ বক্স + ভয়েস বাটন + সেন্ড বাটন)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
                       decoration: const BoxDecoration(
                         color: AppColors.bgSurface,
                         border: Border(
@@ -687,24 +963,60 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 controller: _inputController,
                                 style: GoogleFonts.notoSansBengali(fontSize: 13),
                                 decoration: InputDecoration(
-                                  hintText: isBn
-                                      ? 'যেকোনো সরকারি সেবা সম্পর্কে প্রশ্ন করুন...'
-                                      : 'Ask anything about citizen services...',
+                                  hintText: _isListening
+                                      ? (isBn
+                                          ? 'শুনছি... বলুন'
+                                          : 'Listening... speak now')
+                                      : (isBn
+                                          ? 'যেকোনো সরকারি সেবা সম্পর্কে প্রশ্ন করুন...'
+                                          : 'Ask anything about citizen services...'),
                                   isDense: true,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 10),
                                   border: const OutlineInputBorder(
                                     borderRadius: BorderRadius.zero,
-                                    borderSide: BorderSide(color: AppColors.border),
+                                    borderSide:
+                                        BorderSide(color: AppColors.border),
                                   ),
                                   focusedBorder: const OutlineInputBorder(
                                     borderRadius: BorderRadius.zero,
-                                    borderSide: BorderSide(color: AppColors.primaryGreen, width: 1.5),
+                                    borderSide: BorderSide(
+                                        color: AppColors.primaryGreen,
+                                        width: 1.5),
                                   ),
                                 ),
                                 onSubmitted: (_) => _sendMessage(),
                               ),
                             ),
                             const SizedBox(width: 8),
+
+                            // 🎤 ভয়েস বাটন
+                            IconButton(
+                              tooltip: isBn ? 'ভয়েস ইনপুট' : 'Voice input',
+                              style: IconButton.styleFrom(
+                                backgroundColor: _isListening
+                                    ? Colors.red
+                                    : AppColors.bgMuted,
+                                foregroundColor: _isListening
+                                    ? Colors.white
+                                    : AppColors.primaryGreen,
+                                shape: RoundedRectangleBorder(
+                                  side: BorderSide(
+                                    color: _isListening
+                                        ? Colors.red
+                                        : AppColors.border,
+                                  ),
+                                ),
+                              ),
+                              icon: Icon(
+                                _isListening ? Icons.stop : Icons.mic,
+                                size: 18,
+                              ),
+                              onPressed: _toggleVoiceInput,
+                            ),
+                            const SizedBox(width: 6),
+
+                            // সেন্ড বাটন
                             IconButton(
                               style: IconButton.styleFrom(
                                 backgroundColor: AppColors.primaryGreen,
@@ -727,6 +1039,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
       },
     ).whenComplete(() {
       _modalSetState = null;
+      _speech.stop();
+      _isListening = false;
     });
   }
 
@@ -736,11 +1050,10 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     final langProvider = Provider.of<LanguageProvider>(context);
     final isBn = langProvider.isBn;
 
-    // Guaranteed on-screen safety calculation (fixes off-screen positioning bug)
+    // বাবলকে সবসময় স্ক্রিনের ভেতরে রাখার হিসাব
     final double screenW = size.width > 50 ? size.width : 390.0;
     final double screenH = size.height > 100 ? size.height : 800.0;
 
-    // Always keep bubble strictly within visible bounds
     if (_x <= 0 || _x > screenW - 64) {
       _x = screenW - 74.0;
     }
@@ -753,7 +1066,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
       children: [
         widget.child,
 
-        // Floating Movable Jonobondhu AI Bubble (Styled 100% Identical to Website)
+        // ভাসমান, সরানোযোগ্য জনবন্ধু AI বাবলে
         Positioned(
           left: _x,
           top: _y,
@@ -766,7 +1079,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
               });
             },
             onPanEnd: (details) {
-              // Snap to nearest side (left or right) keeping released vertical height
+              // ছেড়ে দিলে নিকটতম পাশে (বাম/ডান) স্ন্যাপ করবে
               setState(() {
                 if (_x + 30 < screenW / 2) {
                   _x = 12;
@@ -781,14 +1094,14 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
-                  // Circular White Bubble with Bangladesh Green Border (Matches Website JonobondhuChat)
                   Container(
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white,
-                      border: Border.all(color: AppColors.primaryGreen, width: 2.5),
+                      border:
+                          Border.all(color: AppColors.primaryGreen, width: 2.5),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.22),
@@ -804,7 +1117,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                     ),
                   ),
 
-                  // Active AI Indicator Dot
+                  // সক্রিয় AI ইন্ডিকেটর ডট
                   Positioned(
                     top: 2,
                     right: 2,
@@ -819,14 +1132,15 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                     ),
                   ),
 
-                  // Tooltip badge pill
+                  // টুলটিপ ব্যাজ
                   Positioned(
                     bottom: -6,
                     left: 0,
                     right: 0,
                     child: Center(
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1.5),
                         color: AppColors.darkGreen,
                         child: Text(
                           isBn ? 'জনবন্ধু AI' : 'Jonobondhu',

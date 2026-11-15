@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../screens/image_verification_screen.dart';
 
 class DocumentLockerTab extends StatefulWidget {
   const DocumentLockerTab({super.key});
@@ -49,8 +50,8 @@ void _showUploadDialog() {
     builder: (ctx) {
       return StatefulBuilder(
         builder: (context, setDialogState) {
-          // Camera দিয়ে Scan
-          Future<void> scanDocument() async {
+          // Camera দিয়ে Scan এবং AI যাচাই
+          Future<void> scanDocumentWithAi() async {
             final picker = ImagePicker();
 
             final XFile? image = await picker.pickImage(
@@ -58,15 +59,42 @@ void _showUploadDialog() {
               imageQuality: 90,
             );
 
-            if (image != null) {
+            if (image != null && context.mounted) {
               final file = File(image.path);
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ImageVerificationScreen(
+                    initialImageFile: file,
+                    initialDocType: selectedType,
+                  ),
+                ),
+              );
+            }
+          }
 
-              setDialogState(() {
-                selectedLocalFile = file;
-                selectedFileName = image.name;
-                selectedFileSize = file.lengthSync();
-                selectedMimeType = 'image/jpeg';
-              });
+          // Gallery থেকে ছবি নির্বাচন এবং AI যাচাই
+          Future<void> galleryDocumentWithAi() async {
+            final picker = ImagePicker();
+
+            final XFile? image = await picker.pickImage(
+              source: ImageSource.gallery,
+              imageQuality: 90,
+            );
+
+            if (image != null && context.mounted) {
+              final file = File(image.path);
+              Navigator.pop(ctx);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ImageVerificationScreen(
+                    initialImageFile: file,
+                    initialDocType: selectedType,
+                  ),
+                ),
+              );
             }
           }
 
@@ -184,25 +212,51 @@ void _showUploadDialog() {
 
                   Row(
                     children: [
-                      // Scan Button
+                      // Camera Scan Button (AI)
                       Expanded(
                         child: OutlinedButton.icon(
-                          onPressed: scanDocument,
+                          onPressed: scanDocumentWithAi,
                           icon: const Icon(
-                            Icons.document_scanner_outlined,
-                            size: 18,
+                            Icons.camera_alt_outlined,
+                            size: 16,
                           ),
                           label: Text(
-                            isBn ? 'স্ক্যান' : 'Scan',
+                            isBn ? 'ক্যামেরা (AI)' : 'Camera (AI)',
                             style: GoogleFonts.notoSansBengali(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
                             ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                           ),
                         ),
                       ),
 
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
+
+                      // Gallery Button (AI)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: galleryDocumentWithAi,
+                          icon: const Icon(
+                            Icons.photo_library_outlined,
+                            size: 16,
+                          ),
+                          label: Text(
+                            isBn ? 'গ্যালারি (AI)' : 'Gallery (AI)',
+                            style: GoogleFonts.notoSansBengali(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(width: 6),
 
                       // Upload File Button
                       Expanded(
@@ -210,14 +264,17 @@ void _showUploadDialog() {
                           onPressed: uploadFile,
                           icon: const Icon(
                             Icons.upload_file_outlined,
-                            size: 18,
+                            size: 16,
                           ),
                           label: Text(
-                            isBn ? 'ফাইল আপলোড' : 'Upload File',
+                            isBn ? 'ফাইল/PDF' : 'PDF/File',
                             style: GoogleFonts.notoSansBengali(
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
                             ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                           ),
                         ),
                       ),
@@ -323,6 +380,8 @@ void _showUploadDialog() {
 
                     // আসল file data Base64-এ convert করা হচ্ছে
                     final realFileData = base64Encode(bytes);
+
+                    if (!context.mounted) return;
 
                     final auth = Provider.of<AuthProvider>(
                       context,
@@ -582,15 +641,19 @@ void _showUploadDialog() {
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        langProvider.t('locker.vaultTitle'),
-                        style: GoogleFonts.notoSansBengali(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
+                      Expanded(
+                        child: Text(
+                          langProvider.t('locker.vaultTitle'),
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                       ),
+                      const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: _showUploadDialog,
                         icon: const Icon(Icons.add, size: 14),

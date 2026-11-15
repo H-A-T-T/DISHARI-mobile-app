@@ -121,7 +121,7 @@ class AppTranslations {
     'dashboard.demoLogin': {'bn': 'ডেমো নাগরিক হিসেবে প্রবেশ করুন (১-ক্লিক)', 'en': 'Enter as Demo Citizen (1-Click)'},
 
     // Document Locker
-    'locker.vaultTitle': {'bn': 'ডিজিটাল নাগরিক নথিপত্র লকার', 'en': 'Digital Citizen Document Locker'},
+    'locker.vaultTitle': {'bn': 'ডিজিটাল নাগরিক নথিপত্র', 'en': 'Digital Citizen Document'},
     'locker.vaultSubtitle': {'bn': 'আপনার NID, জন্ম নিবন্ধন, ছবি একবার আপলোড করুন — যেকোনো সরকারি আবেদনে বারবার ব্যবহার করুন।', 'en': 'Upload your NID, birth certificate, and photo once — reuse across any citizen service.'},
     'locker.uploadBtn': {'bn': 'নতুন নথি যুক্ত করুন', 'en': 'Upload Document'},
     'locker.vaultStatus': {'bn': 'লকার প্রস্তুতি মাত্রা', 'en': 'Locker Completeness'},
@@ -134,6 +134,15 @@ class AppTranslations {
     'deadlines.ongoing': {'bn': 'চলমান কার্যক্রম', 'en': 'Ongoing Cycle'},
     'deadlines.requiredDocs': {'bn': 'প্রয়োজনীয় কাগজপত্র:', 'en': 'Required Papers:'},
     'deadlines.applyNow': {'bn': 'আবেদন পোর্টাল', 'en': 'Application Portal'},
+
+    // Opportunities & Weather & Bag Checker
+    'opportunities.title': {'bn': 'সরকারি সুযোগ ও সহায়তা হাব', 'en': 'Citizen Opportunity Hub'},
+    'opportunities.radar': {'bn': 'নাগরিক সুযোগ রাডার', 'en': 'Citizen Opportunity Radar'},
+    'opportunities.browseAll': {'bn': 'সকল সুযোগ ব্রাউজ করুন', 'en': 'Browse All Schemes'},
+    'weather.title': {'bn': 'আবহাওয়া ও গ্রামীণ কৃষি নাগরিক বার্তা', 'en': 'Weather & Rural Civic Advisory'},
+    'weather.live': {'bn': 'লাইভ আপডেট', 'en': 'LIVE'},
+    'bagChecker.title': {'bn': '“আমার ব্যাগে সব কাগজ আছে তো?”', 'en': '"Do I have all documents in my bag?"'},
+    'bagChecker.meter': {'bn': 'প্রস্তুতি মিটার', 'en': 'Pre-Flight Check'},
 
     // Auth
     'auth.loginTitle': {'bn': 'নাগরিক লগইন', 'en': 'Citizen Log In'},

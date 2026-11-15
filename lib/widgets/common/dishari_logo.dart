@@ -46,11 +46,12 @@ class DishariLogo extends StatelessWidget {
                 ),
               ),
               Text(
-                isBn ? 'সরকারি সেবা সহজ ভাষায়' : 'Government Services Simplified',
+                isBn ? 'ডিজিটাল নাগরিক সহায়ক' : 'Digital Citizen Assistant',
                 style: GoogleFonts.notoSansBengali(
                   fontSize: height * 0.24,
                   fontWeight: FontWeight.w600,
-                  color: isDark ? const Color(0xFF6EE7B7) : AppColors.primaryGreen,
+                  color:
+                      isDark ? const Color(0xFF6EE7B7) : AppColors.primaryGreen,
                   height: 1.1,
                 ),
               ),
@@ -61,4 +62,3 @@ class DishariLogo extends StatelessWidget {
     );
   }
 }
-

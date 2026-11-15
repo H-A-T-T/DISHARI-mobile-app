@@ -41,7 +41,7 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           ),
           Container(
             height: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
             decoration: const BoxDecoration(
               color: AppColors.bgSurface,
               border: Border(
@@ -50,39 +50,51 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Logo
-                DishariLogo(
-                  height: 34,
-                  isBn: isBn,
+                // 1. Dishari Logo (Responsive scaling to prevent pushing actions off-screen)
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: DishariLogo(
+                      height: 32,
+                      isBn: isBn,
+                    ),
+                  ),
                 ),
 
-                // Action Buttons
+                const SizedBox(width: 6),
+
+                // Action Buttons Row (Sections 2, 3, 4)
                 Row(
                   mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Helpline 333 Button
+                    // 2. Helpline 333 Button
                     InkWell(
                       onTap: _callHelpline,
                       borderRadius: BorderRadius.zero,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.lightGreen50,
                           border: Border.all(
-                            color:
-                                AppColors.primaryGreen.withValues(alpha: 0.3),
+                            color: AppColors.primaryGreen.withValues(alpha: 0.3),
                           ),
                         ),
                         child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
                               Icons.phone,
                               size: 13,
                               color: AppColors.primaryGreen,
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 3),
                             Text(
                               isBn ? '৩৩৩' : '333',
                               style: GoogleFonts.plusJakartaSans(
@@ -95,15 +107,18 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
 
-                    // Language Switcher Pill
+                    const SizedBox(width: 4),
+
+                    // 3. Language Switcher Pill
                     InkWell(
                       onTap: () => langProvider.toggleLanguage(),
                       borderRadius: BorderRadius.zero,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
+                          horizontal: 7,
+                          vertical: 4,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.bgMuted,
                           border: Border.all(color: AppColors.border),
@@ -119,10 +134,13 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                       ),
                     ),
 
-                    // Notifications Icon
+                    // 4. Notifications Icon
                     if (onNotificationTap != null) ...[
-                      const SizedBox(width: 4),
+                      const SizedBox(width: 2),
                       IconButton(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.all(4),
+                        constraints: const BoxConstraints(),
                         icon: const Icon(
                           Icons.notifications_none_outlined,
                           color: AppColors.textPrimary,

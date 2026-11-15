@@ -1,0 +1,169 @@
+{
+  "name": "Capture_image_info",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "extract-image",
+        "responseMode": "responseNode",
+        "options": {
+          "allowedOrigins": "*",
+          "binaryPropertyName": "file"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -208,
+        -208
+      ],
+      "id": "ad4baa64-c7ee-4453-b423-00cd6e6babca",
+      "name": "Webhook",
+      "webhookId": "46cd6854-42a2-40bc-88f9-e1e6fb6f5a50"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "={{ $env.GEMINI_API_KEY }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"contents\": [\n    {\n      \"parts\": [\n        {\n          \"text\": \"Extract all text and details from this ID card (such as Name, Roll, ID Number, Blood Group, etc.) and return it as a clean, readable text or JSON structure.\"\n        },\n        {\n          \"inline_data\": {\n            \"mime_type\": \"{{ $json.mimeType }}\",\n            \"data\": \"{{ $json.imagebase64 }}\"\n          }\n        }\n      ]\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        256,
+        -416
+      ],
+      "id": "f3614077-feaf-4c3c-b59b-1af07c356734",
+      "name": "HTTP Request",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        752,
+        -208
+      ],
+      "id": "bd10cea9-cb64-4b10-8e58-d0d9b146de8c",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst newItem = items[0];\n\nnewItem.json = newItem.json || {};\n\n// Find whatever binary key was sent (e.g., 'file', 'file0', 'data')\nconst binaryKey = Object.keys(newItem.binary || {})[0];\n\nif (binaryKey) {\n  const binaryData = await this.helpers.getBinaryDataBuffer(0, binaryKey);\n  newItem.json.imagebase64 = binaryData.toString('base64');\n  newItem.json.mimeType = newItem.binary[binaryKey].mimeType;\n} else {\n  newItem.json.imagebase64 = \"\";\n  newItem.json.mimeType = \"image/jpeg\";\n}\n\nreturn [newItem];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        -208
+      ],
+      "id": "32f7d6cb-3bd6-475a-8079-b4267083da78",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\n\nreturn items.map((item) => {\n  try {\n    // Get Gemini's response\n    const parts =\n      item.json.candidates?.[0]?.content?.parts || [];\n\n    const responseText = parts\n      .map(part => part.text || \"\")\n      .join(\"\\n\");\n\n    if (!responseText) {\n      throw new Error(\"Gemini returned empty text\");\n    }\n\n    // Extract JSON from Markdown code fences\n    const match = responseText.match(\n      /```(?:json)?\\s*([\\s\\S]*?)```/i\n    );\n\n    let jsonText;\n\n    if (match) {\n      jsonText = match[1].trim();\n    } else {\n      // Fallback: find JSON object in response\n      const start = responseText.indexOf(\"{\");\n      const end = responseText.lastIndexOf(\"}\");\n\n      if (start === -1 || end === -1) {\n        throw new Error(\"No JSON object found in Gemini response\");\n      }\n\n      jsonText = responseText.substring(start, end + 1);\n    }\n\n    // Parse JSON\n    const extracted = JSON.parse(jsonText);\n\n    // Return structured result\n    return {\n      json: {\n        success: true,\n        document: extracted\n      }\n    };\n\n  } catch (error) {\n    return {\n      json: {\n        success: false,\n        error: error.message,\n        document: null\n      }\n    };\n  }\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        -208
+      ],
+      "id": "9c4b496e-8f78-435e-b2a4-02b65fa6cd07",
+      "name": "Code in JavaScript1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "63d14f4b-cdee-41e5-ab0f-c584e983ace2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f8db5e9bb4fc971dc3d639a1e1b3f0594db6e328548408f239fa3a50ca231562"
+  },
+  "nodeGroups": [],
+  "id": "fsJnTYCrRv1kEfjt",
+  "tags": []
+}

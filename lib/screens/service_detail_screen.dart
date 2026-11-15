@@ -10,6 +10,7 @@ import '../providers/language_provider.dart';
 import '../providers/services_provider.dart';
 import '../services/api_service.dart';
 import '../widgets/services/application_modal.dart';
+import '../widgets/services/smart_bag_checker.dart';
 
 class ServiceDetailScreen extends StatefulWidget {
   final String slug;
@@ -68,6 +69,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   Widget build(BuildContext context) {
     final langProvider = context.watch<LanguageProvider>();
     final auth = context.watch<AuthProvider>();
+    final dashboard = context.watch<DashboardProvider>();
     final isBn = langProvider.isBn;
 
     if (_isLoading) {
@@ -312,108 +314,19 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Required Documents Interactive Checklist
-            Text(
-              langProvider.t('detail.requiredPapers'),
-              style: GoogleFonts.notoSansBengali(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+            // Smart Pre-Flight Bag Checker
+            SmartBagChecker(
+              service: s,
+              userLockerDocTypes:
+                  dashboard.documents.map((d) => d.docType).toList(),
+              checkedInBag: _checkedDocs,
+              onCheckedChange: (updated) {
+                setState(() {
+                  _checkedDocs.clear();
+                  _checkedDocs.addAll(updated);
+                });
+              },
             ),
-            Text(
-              langProvider.t('detail.papersSubtitle'),
-              style: GoogleFonts.notoSansBengali(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            ...s.requiredDocs.asMap().entries.map((entry) {
-              final idx = entry.key;
-              final doc = entry.value;
-              final isChecked = _checkedDocs[idx] ?? false;
-
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isChecked ? AppColors.lightGreen50 : AppColors.bgSurface,
-                  border: Border.all(
-                    color: isChecked ? AppColors.primaryGreen : AppColors.border,
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _checkedDocs[idx] = !isChecked;
-                        });
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 2, right: 8),
-                        child: Icon(
-                          isChecked ? Icons.check_box : Icons.check_box_outline_blank,
-                          size: 18,
-                          color: isChecked ? AppColors.primaryGreen : AppColors.textMuted,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  isBn ? doc.nameBn : doc.nameEn,
-                                  style: GoogleFonts.notoSansBengali(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.textPrimary,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                color: AppColors.bgMuted,
-                                child: Text(
-                                  doc.copyType == 'both'
-                                      ? (isBn ? 'মূল ও ফটোকপি' : 'Both')
-                                      : doc.copyType == 'photocopy'
-                                          ? (isBn ? 'ফটোকপি' : 'Copy')
-                                          : (isBn ? 'মূল কপি' : 'Original'),
-                                  style: GoogleFonts.notoSansBengali(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (doc.noteBn != null) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              doc.noteBn!,
-                              style: GoogleFonts.notoSansBengali(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                                height: 1.4,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
             const SizedBox(height: 20),
 
             // Step-by-Step Instructions

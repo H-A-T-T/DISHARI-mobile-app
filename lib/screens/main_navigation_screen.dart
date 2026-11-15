@@ -65,6 +65,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     ];
 
     return JonobondhuChatOverlay(
+      onNavigateTab: _onTabTapped,
       child: Scaffold(
         backgroundColor: AppColors.bgPage,
         // Persistent fixed top AppBar with SafeArea to prevent status bar overlap

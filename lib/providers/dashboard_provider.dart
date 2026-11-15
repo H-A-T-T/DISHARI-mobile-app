@@ -179,6 +179,12 @@ class DashboardProvider extends ChangeNotifier {
     return false;
   }
 
+  void addVerifiedDocument(CitizenDocument doc) {
+    _documents.removeWhere((d) => d.id == doc.id || (d.docType == doc.docType && d.fileName == doc.fileName));
+    _documents.insert(0, doc);
+    notifyListeners();
+  }
+
   Future<bool> deleteDocument(int id) async {
     _isLoading = true;
     notifyListeners();

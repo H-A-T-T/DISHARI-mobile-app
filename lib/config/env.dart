@@ -61,6 +61,27 @@ class EnvConfig {
     }
   }
 
+  /// n8n Webhook URL for image extraction
+  static String get n8nWebhookUrl {
+    try {
+      final envUrl = dotenv.env['N8N_WEBHOOK_URL']?.trim();
+      if (envUrl != null && envUrl.isNotEmpty) {
+        if (kIsWeb && envUrl.contains('10.0.2.2')) {
+          return envUrl.replaceAll('10.0.2.2', 'localhost');
+        }
+        return envUrl;
+      }
+    } catch (_) {}
+
+    if (kIsWeb) {
+      return 'http://localhost:5678/webhook/extract-image';
+    }
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://10.0.2.2:5678/webhook/extract-image';
+    }
+    return 'http://localhost:5678/webhook/extract-image';
+  }
+
   /// Returns true if any AI API key or URL is configured
   static bool get hasAiConfigured {
     return geminiApiKey.isNotEmpty ||
