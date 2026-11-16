@@ -23,6 +23,12 @@ class MainNavigationScreen extends StatefulWidget {
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    JonobondhuChatOverlay.globalNavigateTab = _onTabTapped;
+  }
+
   void _onTabTapped(int index) {
     setState(() {
       _currentIndex = index;
@@ -64,55 +70,52 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       DashboardScreen(onNavigateTab: _onTabTapped),
     ];
 
-    return JonobondhuChatOverlay(
-      onNavigateTab: _onTabTapped,
-      child: Scaffold(
-        backgroundColor: AppColors.bgPage,
-        // Persistent fixed top AppBar with SafeArea to prevent status bar overlap
-        appBar: CustomAppBar(
-          onNotificationTap: () {
-            _onTabTapped(3); // Jump to Deadlines tab
-          },
-        ),
-        // Persistent body routing: switches only the middle content
-        body: IndexedStack(
-          index: _currentIndex,
-          children: screens,
-        ),
-        // Persistent fixed bottom navigation bar
-        bottomNavigationBar: Container(
-          decoration: const BoxDecoration(
-            color: AppColors.bgSurface,
-            border: Border(
-              top: BorderSide(color: AppColors.border, width: 1),
-            ),
+    return Scaffold(
+      backgroundColor: AppColors.bgPage,
+      // Persistent fixed top AppBar with SafeArea to prevent status bar overlap
+      appBar: CustomAppBar(
+        onNotificationTap: () {
+          _onTabTapped(3); // Jump to Deadlines tab
+        },
+      ),
+      // Persistent body routing: switches only the middle content
+      body: IndexedStack(
+        index: _currentIndex,
+        children: screens,
+      ),
+      // Persistent fixed bottom navigation bar
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.bgSurface,
+          border: Border(
+            top: BorderSide(color: AppColors.border, width: 1),
           ),
-          child: BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: _onTabTapped,
-            type: BottomNavigationBarType.fixed,
-            backgroundColor: AppColors.bgSurface,
-            elevation: 0,
-            selectedItemColor: AppColors.primaryGreen,
-            unselectedItemColor: AppColors.textMuted,
-            selectedLabelStyle: GoogleFonts.notoSansBengali(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              height: 1.4,
-            ),
-            unselectedLabelStyle: GoogleFonts.notoSansBengali(
-              fontSize: 10,
-              fontWeight: FontWeight.w500,
-              height: 1.4,
-            ),
-            items: tabs.map((tab) {
-              return BottomNavigationBarItem(
-                icon: Icon(tab.icon, size: 20),
-                activeIcon: Icon(tab.activeIcon, size: 20),
-                label: isBn ? tab.labelBn : tab.labelEn,
-              );
-            }).toList(),
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: _onTabTapped,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: AppColors.bgSurface,
+          elevation: 0,
+          selectedItemColor: AppColors.primaryGreen,
+          unselectedItemColor: AppColors.textMuted,
+          selectedLabelStyle: GoogleFonts.notoSansBengali(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            height: 1.4,
           ),
+          unselectedLabelStyle: GoogleFonts.notoSansBengali(
+            fontSize: 10,
+            fontWeight: FontWeight.w500,
+            height: 1.4,
+          ),
+          items: tabs.map((tab) {
+            return BottomNavigationBarItem(
+              icon: Icon(tab.icon, size: 20),
+              activeIcon: Icon(tab.activeIcon, size: 20),
+              label: isBn ? tab.labelBn : tab.labelEn,
+            );
+          }).toList(),
         ),
       ),
     );

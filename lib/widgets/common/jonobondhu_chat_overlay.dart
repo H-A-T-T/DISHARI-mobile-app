@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import '../../config/constants.dart';
 import '../../config/env.dart';
 import '../../providers/language_provider.dart';
-import '../../screens/image_verification_screen.dart';
 import '../../screens/opportunities_screen.dart';
 import '../../screens/service_detail_screen.dart';
 import '../../screens/about_screen.dart';
@@ -20,18 +19,26 @@ class ChatMessage {
   final bool isUser;
   final String text;
   final String time;
+  final File? imageFile;
 
   ChatMessage({
     required this.id,
     required this.isUser,
     required this.text,
     required this.time,
+    this.imageFile,
   });
 }
 
 class JonobondhuChatOverlay extends StatefulWidget {
   final Widget child;
   final void Function(int tabIndex)? onNavigateTab;
+
+  /// Global navigator key to allow opening modals & routes anywhere in the app
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  /// Global tab navigation handler
+  static void Function(int tabIndex)? globalNavigateTab;
 
   const JonobondhuChatOverlay({
     super.key,
@@ -58,6 +65,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
   static final List<ChatMessage> _sharedMessages = [];
 
   bool _isTyping = false;
+  bool _isChatOpen = false;
+  File? _stagedImage;
   StateSetter? _modalSetState;
 
   // ভয়েস ইনপুট
@@ -65,13 +74,14 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
   bool _isListening = false;
 
   static _JonobondhuChatOverlayState? _activeState;
-  static void Function(int tabIndex)? globalNavigateTab;
 
   @override
   void initState() {
     super.initState();
     _activeState = this;
-    globalNavigateTab = widget.onNavigateTab;
+    if (widget.onNavigateTab != null) {
+      JonobondhuChatOverlay.globalNavigateTab = widget.onNavigateTab;
+    }
     if (_sharedMessages.isEmpty) {
       _initDefaultMessages();
     }
@@ -81,32 +91,33 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
   void didUpdateWidget(covariant JonobondhuChatOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.onNavigateTab != null) {
-      globalNavigateTab = widget.onNavigateTab;
+      JonobondhuChatOverlay.globalNavigateTab = widget.onNavigateTab;
     }
   }
 
   static void navigateFromAction(BuildContext context, String type, String target) {
+    final navContext = JonobondhuChatOverlay.navigatorKey.currentContext ?? context;
     // Dismiss chat sheet or dialog
-    Navigator.of(context, rootNavigator: true).pop();
+    Navigator.of(navContext, rootNavigator: true).pop();
 
     if (type == 'tab') {
       final tabIdx = int.tryParse(target) ?? 0;
-      globalNavigateTab?.call(tabIdx);
+      JonobondhuChatOverlay.globalNavigateTab?.call(tabIdx);
     } else if (type == 'service') {
-      Navigator.of(context).push(
+      Navigator.of(navContext).push(
         MaterialPageRoute(
           builder: (_) => ServiceDetailScreen(slug: target),
         ),
       );
     } else if (type == 'screen') {
       if (target == 'opportunities') {
-        Navigator.of(context).push(
+        Navigator.of(navContext).push(
           MaterialPageRoute(
             builder: (_) => const OpportunitiesScreen(),
           ),
         );
       } else if (target == 'about') {
-        Navigator.of(context).push(
+        Navigator.of(navContext).push(
           MaterialPageRoute(
             builder: (_) => const AboutScreen(),
           ),
@@ -356,19 +367,27 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     }
 
     final text = (customText ?? _inputController.text).trim();
-    if (text.isEmpty) return;
+    final hasImage = _stagedImage != null;
+    if (text.isEmpty && !hasImage) return;
 
     if (!mounted) return;
     final langProvider = Provider.of<LanguageProvider>(context, listen: false);
     final isBn = langProvider.isBn;
 
+    final imageToSend = _stagedImage;
+    _stagedImage = null;
     _inputController.clear();
 
     final userMsg = ChatMessage(
       id: 'user-${DateTime.now().millisecondsSinceEpoch}',
       isUser: true,
-      text: text,
+      text: text.isNotEmpty
+          ? text
+          : (imageToSend != null
+              ? (isBn ? '📷 নথির ছবি বিশ্লেষণ করুন' : '📷 Analyze this document image')
+              : ''),
       time: _currentTimeString(isBn),
+      imageFile: imageToSend,
     );
 
     setState(() {
@@ -380,7 +399,58 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
     }
     _scrollToBottom();
 
-    // AI-এর জন্য সাম্প্রতিক কথোপকথন
+    // যদি ইমেজ পাঠানো হয়, তাহলে AI সরাসরি ইমেজটি বিশ্লেষণ করে চ্যাটে উত্তর দেবে
+    if (imageToSend != null) {
+      try {
+        final reply = await AgentService.analyzeImage(
+          imageFile: imageToSend,
+          userPrompt: text.isNotEmpty ? text : null,
+          isBn: isBn,
+        );
+
+        if (!mounted) return;
+
+        final aiMsg = ChatMessage(
+          id: 'ai-${DateTime.now().millisecondsSinceEpoch}',
+          isUser: false,
+          text: reply,
+          time: _currentTimeString(isBn),
+        );
+
+        setState(() {
+          _isTyping = false;
+          _sharedMessages.add(aiMsg);
+        });
+        if (_modalSetState != null) {
+          _modalSetState!(() {});
+        }
+        _scrollToBottom();
+        return;
+      } catch (e) {
+        debugPrint('Image analysis error: $e');
+        if (!mounted) return;
+        setState(() {
+          _isTyping = false;
+          _sharedMessages.add(
+            ChatMessage(
+              id: 'ai-err-${DateTime.now().millisecondsSinceEpoch}',
+              isUser: false,
+              text: isBn
+                  ? '⚠️ ছবিটি বিশ্লেষণে সাময়িক সমস্যা হয়েছে। অনুগ্রহ করে পরিষ্কার ছবি দিয়ে পুনরায় চেষ্টা করুন।'
+                  : '⚠️ Failed to analyze image. Please provide a clearer photo.',
+              time: _currentTimeString(isBn),
+            ),
+          );
+        });
+        if (_modalSetState != null) {
+          _modalSetState!(() {});
+        }
+        _scrollToBottom();
+        return;
+      }
+    }
+
+    // AI-এর জন্য সাম্প্রতিক টেক্সট কথোপকথন
     final history = _sharedMessages
         .where((m) => m.id != 'welcome')
         .map((m) => (isUser: m.isUser, text: m.text))
@@ -445,53 +515,9 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
 
         if (image != null && mounted) {
           final file = File(image.path);
-
-          final userMsg = ChatMessage(
-            id: 'user-img-${DateTime.now().millisecondsSinceEpoch}',
-            isUser: true,
-            text: isBn
-                ? '📷 [ক্যামেরা দিয়ে ছবি তোলা হয়েছে: ${image.name}]'
-                : '📷 [Image captured via Camera: ${image.name}]',
-            time: _currentTimeString(isBn),
-          );
-
-          setState(() {
-            _sharedMessages.add(userMsg);
-            _isTyping = true;
-          });
-          if (_modalSetState != null) _modalSetState!(() {});
-          _scrollToBottom();
-
-          if (modalContext.mounted) {
-            Navigator.push(
-              modalContext,
-              MaterialPageRoute(
-                builder: (_) => ImageVerificationScreen(
-                  initialImageFile: file,
-                ),
-              ),
-            ).then((_) {
-              if (mounted) {
-                setState(() {
-                  _isTyping = false;
-                  _sharedMessages.add(
-                    ChatMessage(
-                      id: 'ai-doc-${DateTime.now().millisecondsSinceEpoch}',
-                      isUser: false,
-                      text: isBn
-                          ? '✅ আপনার নথির ছবি সফলভাবে বিশ্লেষণ করা হয়েছে! এটি যাচাই ও লকারে সংরক্ষণের জন্য প্রস্তুত।\n\n'
-                            '[ACTION:tab:2:নাগরিক লকারে সংরক্ষিত নথি দেখুন]'
-                          : '✅ Document image analyzed successfully! Ready in your locker.\n\n'
-                            '[ACTION:tab:2:View in Document Locker]',
-                      time: _currentTimeString(isBn),
-                    ),
-                  );
-                });
-                if (_modalSetState != null) _modalSetState!(() {});
-                _scrollToBottom();
-              }
-            });
-          }
+          _stagedImage = file;
+          _refreshUi();
+          await _sendMessage();
         }
       } catch (e) {
         debugPrint('Camera capture error: $e');
@@ -506,53 +532,9 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
 
         if (image != null && mounted) {
           final file = File(image.path);
-
-          final userMsg = ChatMessage(
-            id: 'user-img-${DateTime.now().millisecondsSinceEpoch}',
-            isUser: true,
-            text: isBn
-                ? '🖼️ [গ্যালারি থেকে ছবি আপলোড করা হয়েছে: ${image.name}]'
-                : '🖼️ [Image uploaded from Gallery: ${image.name}]',
-            time: _currentTimeString(isBn),
-          );
-
-          setState(() {
-            _sharedMessages.add(userMsg);
-            _isTyping = true;
-          });
-          if (_modalSetState != null) _modalSetState!(() {});
-          _scrollToBottom();
-
-          if (modalContext.mounted) {
-            Navigator.push(
-              modalContext,
-              MaterialPageRoute(
-                builder: (_) => ImageVerificationScreen(
-                  initialImageFile: file,
-                ),
-              ),
-            ).then((_) {
-              if (mounted) {
-                setState(() {
-                  _isTyping = false;
-                  _sharedMessages.add(
-                    ChatMessage(
-                      id: 'ai-doc-${DateTime.now().millisecondsSinceEpoch}',
-                      isUser: false,
-                      text: isBn
-                          ? '✅ গ্যালারি থেকে আপলোডকৃত নথিটি AI দিয়ে যাচাই করা হয়েছে। এটি লকারে সংরক্ষিত হয়েছে।\n\n'
-                            '[ACTION:tab:2:নাগরিক লকারে দেখুন]'
-                          : '✅ Document from gallery verified with AI and saved to locker.\n\n'
-                            '[ACTION:tab:2:View in Document Locker]',
-                      time: _currentTimeString(isBn),
-                    ),
-                  );
-                });
-                if (_modalSetState != null) _modalSetState!(() {});
-                _scrollToBottom();
-              }
-            });
-          }
+          _stagedImage = file;
+          _refreshUi();
+          await _sendMessage();
         }
       } catch (e) {
         debugPrint('Gallery upload error: $e');
@@ -567,51 +549,47 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
           final file = File(platformFile.path!);
           final name = platformFile.name.toLowerCase();
 
-          final userMsg = ChatMessage(
-            id: 'user-file-${DateTime.now().millisecondsSinceEpoch}',
-            isUser: true,
-            text: isBn
-                ? '📄 [ফাইল সংযুক্ত করা হয়েছে: ${platformFile.name}]'
-                : '📄 [File attached: ${platformFile.name}]',
-            time: _currentTimeString(isBn),
-          );
+          if (name.endsWith('.jpg') ||
+              name.endsWith('.jpeg') ||
+              name.endsWith('.png') ||
+              name.endsWith('.webp')) {
+            _stagedImage = file;
+            _refreshUi();
+            await _sendMessage();
+          } else {
+            final userMsg = ChatMessage(
+              id: 'user-file-${DateTime.now().millisecondsSinceEpoch}',
+              isUser: true,
+              text: isBn
+                  ? '📄 [ফাইল সংযুক্ত করা হয়েছে: ${platformFile.name}]'
+                  : '📄 [File attached: ${platformFile.name}]',
+              time: _currentTimeString(isBn),
+            );
 
-          setState(() {
-            _sharedMessages.add(userMsg);
-            _isTyping = true;
-          });
-          if (_modalSetState != null) _modalSetState!(() {});
-          _scrollToBottom();
+            setState(() {
+              _sharedMessages.add(userMsg);
+              _isTyping = true;
+            });
+            if (_modalSetState != null) _modalSetState!(() {});
+            _scrollToBottom();
 
-          if (name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp')) {
-            if (modalContext.mounted) {
-              Navigator.push(
-                modalContext,
-                MaterialPageRoute(
-                  builder: (_) => ImageVerificationScreen(
-                    initialImageFile: file,
-                  ),
+            await Future.delayed(const Duration(milliseconds: 600));
+            if (!mounted) return;
+            setState(() {
+              _isTyping = false;
+              _sharedMessages.add(
+                ChatMessage(
+                  id: 'ai-file-${DateTime.now().millisecondsSinceEpoch}',
+                  isUser: false,
+                  text: isBn
+                      ? '📄 আপনার ফাইলটি (${platformFile.name}) সফলভাবে গ্রহণ করা হয়েছে। এই নথিটি ব্যবহারের জন্য সংশ্লিষ্ট সেবায় আবেদন করতে পারেন:'
+                      : '📄 File (${platformFile.name}) received. You can use it in your official application:',
+                  time: _currentTimeString(isBn),
                 ),
               );
-            }
-          } else {
-            if (mounted) {
-              setState(() {
-                _isTyping = false;
-                _sharedMessages.add(
-                  ChatMessage(
-                    id: 'ai-file-${DateTime.now().millisecondsSinceEpoch}',
-                    isUser: false,
-                    text: isBn
-                        ? '📄 আপনার ফাইলটি (${platformFile.name}) সফলভাবে গ্রহণ করা হয়েছে। এটি যে সরকারি সেবায় যুক্ত করতে চান, নিচের বাটন থেকে সরাসরি সেই সেবায় যেতে পারেন:'
-                        : '📄 File (${platformFile.name}) received. Select the service below where you want to attach it:',
-                    time: _currentTimeString(isBn),
-                  ),
-                );
-              });
-              if (_modalSetState != null) _modalSetState!(() {});
-              _scrollToBottom();
-            }
+            });
+            if (_modalSetState != null) _modalSetState!(() {});
+            _scrollToBottom();
           }
         }
       } catch (e) {
@@ -935,8 +913,11 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
   }
 
   void _openChatDialog() {
-    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final navContext = JonobondhuChatOverlay.navigatorKey.currentContext ?? context;
+    final langProvider = Provider.of<LanguageProvider>(navContext, listen: false);
     final isBn = langProvider.isBn;
+
+    setState(() => _isChatOpen = true);
 
     final quickPrompts = isBn
         ? [
@@ -957,7 +938,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
           ];
 
     showModalBottomSheet(
-      context: context,
+      context: navContext,
+      useRootNavigator: true,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
@@ -1169,8 +1151,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                         const SizedBox(width: 8),
                                         Text(
                                           isBn
-                                              ? 'জনবন্ধু AI লিখছে...'
-                                              : 'Jonobondhu AI is typing...',
+                                              ? 'জনবন্ধু AI পর্যবেক্ষণ ও বিশ্লেষণ করছে...'
+                                              : 'Jonobondhu AI is analyzing & typing...',
                                           style: GoogleFonts.notoSansBengali(
                                             fontSize: 12,
                                             color: AppColors.textSecondary,
@@ -1211,6 +1193,18 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
+                                    if (msg.imageFile != null) ...[
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Image.file(
+                                          msg.imageFile!,
+                                          width: double.infinity,
+                                          height: 180,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                    ],
                                     Text(
                                       msg.text,
                                       style: GoogleFonts.notoSansBengali(
@@ -1338,9 +1332,49 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                       ),
                       child: SafeArea(
                         top: false,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (_stagedImage != null)
+                              Container(
+                                margin: const EdgeInsets.only(bottom: 8, left: 4),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.lightGreen50,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Image.file(_stagedImage!, width: 36, height: 36, fit: BoxFit.cover),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isBn ? 'ছবি সংযুক্ত হয়েছে' : 'Image attached',
+                                      style: GoogleFonts.notoSansBengali(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primaryGreen,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    InkWell(
+                                      onTap: () {
+                                        _stagedImage = null;
+                                        _refreshUi();
+                                      },
+                                      child: const Icon(Icons.close_rounded, size: 16, color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
                             // (+) ড্রপডাউন বাটন (ChatGPT-র মতো ফাইল ও ছবি আপলোড অপশন)
                             PopupMenuButton<String>(
                               tooltip: isBn ? 'ফাইল ও ছবি আপলোড' : 'Attach file or image',
@@ -1594,21 +1628,26 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          },
+              ],
+            ),
+          ),
         );
       },
-    ).whenComplete(() {
-      _modalSetState = null;
-      _speech.stop();
-      _isListening = false;
-    });
+    );
+  },
+).whenComplete(() {
+  _modalSetState = null;
+  _speech.stop();
+  _isListening = false;
+  if (mounted) {
+    setState(() => _isChatOpen = false);
   }
+});
+}
 
   @override
   Widget build(BuildContext context) {
@@ -1632,11 +1671,12 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
       children: [
         widget.child,
 
-        // ভাসমান, সরানোযোগ্য জনবন্ধু AI বাবলে
-        Positioned(
-          left: _x,
-          top: _y,
-          child: GestureDetector(
+        // ভাসমান, সরানোযোগ্য জনবন্ধু AI বাবল (চ্যাট খোলা থাকলে লুকানো থাকে)
+        if (!_isChatOpen)
+          Positioned(
+            left: _x,
+            top: _y,
+            child: GestureDetector(
             behavior: HitTestBehavior.opaque,
             onPanUpdate: (details) {
               setState(() {

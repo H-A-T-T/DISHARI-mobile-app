@@ -7,6 +7,7 @@ import 'providers/auth_provider.dart';
 import 'providers/services_provider.dart';
 import 'providers/dashboard_provider.dart';
 import 'screens/main_navigation_screen.dart';
+import 'widgets/common/jonobondhu_chat_overlay.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,8 +38,14 @@ class DishariApp extends StatelessWidget {
         builder: (context, langProvider, _) {
           return MaterialApp(
             title: langProvider.isBn ? 'দিশারী' : 'Dishari',
+            navigatorKey: JonobondhuChatOverlay.navigatorKey,
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme,
+            builder: (context, child) {
+              return JonobondhuChatOverlay(
+                child: child ?? const SizedBox.shrink(),
+              );
+            },
             home: const MainNavigationScreen(),
           );
         },

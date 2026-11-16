@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,6 +10,7 @@ import '../../models/application.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/language_provider.dart';
+import '../common/jonobondhu_chat_overlay.dart';
 
 class ApplicationModal extends StatefulWidget {
   final Service service;
@@ -189,9 +191,46 @@ class _ApplicationModalState extends State<ApplicationModal> {
                     ),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.close, size: 20, color: AppColors.textPrimary),
-                  onPressed: () => Navigator.pop(context),
+                Row(
+                  children: [
+                    InkWell(
+                      onTap: () {
+                        JonobondhuChatOverlay.openChat(context);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightGreen50,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.primaryGreen, width: 1),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SvgPicture.asset(
+                              'assets/icons/jonobondhu.svg',
+                              width: 14,
+                              height: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isBn ? 'জনবন্ধু AI' : 'Jonobondhu',
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primaryGreen,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 20, color: AppColors.textPrimary),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
               ],
             ),
