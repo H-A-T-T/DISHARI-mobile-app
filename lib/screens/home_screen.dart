@@ -5,6 +5,7 @@ import '../config/constants.dart';
 import '../providers/language_provider.dart';
 import '../providers/services_provider.dart';
 import '../widgets/home/hero_section.dart';
+import '../widgets/home/stats_section.dart';
 import '../widgets/home/ai_teaser.dart';
 import '../widgets/home/weather_advisory.dart';
 import '../widgets/home/category_grid.dart';
@@ -12,6 +13,7 @@ import '../widgets/home/featured_services.dart';
 import '../widgets/home/how_it_works.dart';
 import 'service_detail_screen.dart';
 import 'opportunities_screen.dart';
+import 'about_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final Function(int targetTab) onNavigateTab;
@@ -47,6 +49,10 @@ class HomeScreen extends StatelessWidget {
               onNavigateTab(1); // Navigate to Services tab
             },
           ),
+          const SizedBox(height: 8),
+
+          // Stats Section (Windows 10 Flat Metric Tiles)
+          const StatsSection(),
           const SizedBox(height: 8),
 
           // Jonobondhu AI Citizen Assistant Banner Card
@@ -202,6 +208,39 @@ class HomeScreen extends StatelessWidget {
                     fontSize: 11,
                     color: const Color(0xFFD1FAE5),
                     height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const AboutScreen(),
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF065F46),
+                      border: Border.all(color: const Color(0xFF10B981), width: 0.8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          isBn ? 'আমাদের লক্ষ্য ও পরিচিতি' : 'Our Mission & About Dishari',
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward_rounded, size: 12, color: Colors.white),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 14),

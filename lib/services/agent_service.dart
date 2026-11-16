@@ -21,6 +21,7 @@ class AgentService {
    - নাগরিক লকারে যেতে: [ACTION:tab:2:নাগরিক লকারে যান]
    - সুযোগ ও অনুদান হাবে যেতে: [ACTION:screen:opportunities:সুযোগ ও অনুদান হাব খুলুন]
    - ডেডলাইন দেখতে: [ACTION:tab:3:ডেডলাইন তালিকা খুলুন]
+   - আমাদের সম্পর্কে বা লক্ষ্য জানতে: [ACTION:screen:about:আমাদের সম্পর্কে জানুন]
 ''';
 
   static const String _systemPromptEn = '''
@@ -40,6 +41,7 @@ Guidelines:
    - Locker: [ACTION:tab:2:Open Document Locker]
    - Opportunities: [ACTION:screen:opportunities:Open Opportunities Hub]
    - Deadlines: [ACTION:tab:3:View Deadlines]
+   - About Dishari: [ACTION:screen:about:Learn About Dishari]
 ''';
 
   /// Sends a query to the AI agent.
@@ -304,6 +306,20 @@ Guidelines:
               '[ACTION:tab:3:ডেডলাইন তালিকা দেখুন]'
           : '📅 View all upcoming civic deadlines and countdown timers:\n\n'
               '[ACTION:tab:3:View Deadlines]';
+    }
+
+    // About Dishari query
+    if (text.contains('আমাদের সম্পর্কে') ||
+        text.contains('দিশারী কী') ||
+        text.contains('লক্ষ্য') ||
+        lower.contains('about') ||
+        lower.contains('who are you') ||
+        lower.contains('what is dishari')) {
+      return isBn
+          ? '🏛️ দিশারী একটি নাগরিক-সহায়তাকারী প্ল্যাটফর্ম যা বাংলাদেশের সাধারণ মানুষকে কোনো দালাল বা মধ্যস্বত্বভোগী ছাড়াই সরকারি সেবা বুঝে নিতে এবং আবেদন সম্পন্ন করতে সাহায্য করে।\n\n'
+              '[ACTION:screen:about:আমাদের সম্পর্কে বিস্তারিত জানুন]'
+          : '🏛️ Dishari is a civic companion designed to empower Bangladeshi citizens to navigate government services with transparency and without middleman exploitation.\n\n'
+              '[ACTION:screen:about:Learn About Dishari]';
     }
 
     // 0. Invalid passport troubleshooting

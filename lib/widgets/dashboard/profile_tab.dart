@@ -5,6 +5,7 @@ import '../../config/constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/language_provider.dart';
+import '../../screens/about_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -259,6 +260,35 @@ class _ProfileTabState extends State<ProfileTab> {
                     child: Text(
                       isBn ? 'তথ্য সংরক্ষণ করুন' : 'Save Changes',
                       style: GoogleFonts.notoSansBengali(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // About Dishari button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AboutScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.info_outline, size: 16, color: AppColors.primaryGreen),
+                    label: Text(
+                      isBn ? 'আমাদের সম্পর্কে ও নাগরিক সনদ' : 'About Dishari & Civic Charter',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryGreen,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.primaryGreen),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                   ),
                 ),

@@ -66,6 +66,10 @@ class AppTranslations {
     'steps.step3Desc': {'bn': 'আপনার হয়ে ফর্ম পূরণ করে আবেদন প্রস্তুত করি', 'en': 'We fill and prepare the application on your behalf'},
 
     // Stats
+    'stats.s1Num': {'bn': '৫০+', 'en': '50+'},
+    'stats.s2Num': {'bn': '৮', 'en': '8'},
+    'stats.s3Num': {'bn': '৩৩৩', 'en': '333'},
+    'stats.s4Num': {'bn': '১০০%', 'en': '100%'},
     'stats.services': {'bn': '৫০+ সরকারি সেবা', 'en': '50+ Government Services'},
     'stats.divisions': {'bn': '৮ বিভাগে সেবা', 'en': 'Services in 8 Divisions'},
     'stats.helpline': {'bn': '৩৩৩ হেল্পলাইন', 'en': '333 Helpline'},

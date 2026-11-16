@@ -11,6 +11,7 @@ import '../../providers/language_provider.dart';
 import '../../screens/image_verification_screen.dart';
 import '../../screens/opportunities_screen.dart';
 import '../../screens/service_detail_screen.dart';
+import '../../screens/about_screen.dart';
 import '../../services/agent_service.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
@@ -102,6 +103,12 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => const OpportunitiesScreen(),
+          ),
+        );
+      } else if (target == 'about') {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => const AboutScreen(),
           ),
         );
       }
@@ -317,6 +324,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
       _refreshUi();
 
       await _speech.listen(
+        // ignore: deprecated_member_use
         localeId: localeId,
         onResult: (result) {
           if (!mounted) return;
