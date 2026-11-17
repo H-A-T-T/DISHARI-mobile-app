@@ -154,46 +154,87 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
           ),
         ),
         if (actionType != null && actionTarget != null && actionLabel != null) ...[
-          const SizedBox(height: 8),
-          InkWell(
-            onTap: () => navigateFromAction(
-              context,
-              actionType!,
-              actionTarget!,
+          const SizedBox(height: 10),
+          Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFFF0FAF5),
+              borderRadius: BorderRadius.zero,
+              border: Border.all(color: AppColors.primaryGreen, width: 1.5),
             ),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primaryGreen,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.primaryGreen.withValues(alpha: 0.25),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Telemetry Card Header (Windows 10 Flat)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  color: AppColors.primaryGreen,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.bolt, size: 14, color: Color(0xFFFDE68A)),
+                          const SizedBox(width: 4),
+                          Text(
+                            'স্বয়ংক্রিয় নেভিগেশন',
+                            style: GoogleFonts.notoSansBengali(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'সক্রিয় রুট',
+                        style: GoogleFonts.notoSansBengali(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFFA7F3D0),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    actionLabel,
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                ),
+                // Card Action Button (Square Shape)
+                Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: InkWell(
+                    onTap: () => navigateFromAction(
+                      context,
+                      actionType!,
+                      actionTarget!,
+                    ),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.zero,
+                        border: Border.all(color: AppColors.primaryGreen, width: 1),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.open_in_new,
+                            size: 13,
+                            color: AppColors.primaryGreen,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            actionLabel,
+                            style: GoogleFonts.notoSansBengali(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryGreen,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 14,
-                    color: Colors.white,
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ],
@@ -694,24 +735,22 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                             decoration: BoxDecoration(
                               color: m.isUser
                                   ? AppColors.primaryGreen
-                                  : AppColors.bgMuted,
-                              borderRadius: m.isUser
-                                  ? const BorderRadius.only(
-                                      topLeft: Radius.circular(18),
-                                      topRight: Radius.circular(18),
-                                      bottomLeft: Radius.circular(18),
-                                      bottomRight: Radius.circular(4),
-                                    )
-                                  : const BorderRadius.only(
-                                      topLeft: Radius.circular(4),
-                                      topRight: Radius.circular(18),
-                                      bottomLeft: Radius.circular(18),
-                                      bottomRight: Radius.circular(18),
+                                  : Colors.white,
+                              borderRadius: BorderRadius.zero,
+                              border: m.isUser
+                                  ? Border.all(
+                                      color: const Color(0xFF004D38),
+                                      width: 1)
+                                  : const Border(
+                                      left: BorderSide(
+                                          color: AppColors.primaryGreen,
+                                          width: 3),
+                                      top: BorderSide(color: AppColors.border),
+                                      right:
+                                          BorderSide(color: AppColors.border),
+                                      bottom:
+                                          BorderSide(color: AppColors.border),
                                     ),
-                              border: Border.all(
-                                  color: m.isUser
-                                      ? AppColors.primaryGreen
-                                      : AppColors.border),
                             ),
                             child: m.isUser
                                 ? Text(
@@ -741,162 +780,192 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                     ),
                     child: SafeArea(
                       top: false,
-                      child: Row(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          PopupMenuButton<String>(
-                            tooltip: isBn ? 'ফাইল ও ছবি আপলোড' : 'Attach file or image',
-                            offset: const Offset(0, -180),
-                            color: Colors.white,
-                            elevation: 6,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                              side: const BorderSide(color: AppColors.border),
-                            ),
-                            onSelected: (val) {
-                              if (_activeState != null) {
-                                _activeState!._handleAttachmentOption(val, ctx);
-                              }
-                            },
-                            itemBuilder: (menuCtx) => [
-                              PopupMenuItem(
-                                value: 'camera',
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 34,
-                                      height: 34,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.lightGreen50,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.camera_alt_rounded, color: AppColors.primaryGreen, size: 18),
+                          Row(
+                            children: [
+                              PopupMenuButton<String>(
+                                tooltip: isBn ? 'ফাইল ও ছবি আপলোড' : 'Attach file or image',
+                                offset: const Offset(0, -180),
+                                color: Colors.white,
+                                elevation: 4,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.zero,
+                                  side: BorderSide(color: AppColors.border),
+                                ),
+                                onSelected: (val) {
+                                  if (_activeState != null) {
+                                    _activeState!._handleAttachmentOption(val, ctx);
+                                  }
+                                },
+                                itemBuilder: (menuCtx) => [
+                                  PopupMenuItem(
+                                    value: 'camera',
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.lightGreen50,
+                                            borderRadius: BorderRadius.zero,
+                                            border: Border.all(color: AppColors.border),
+                                          ),
+                                          child: const Icon(Icons.camera_alt_outlined, color: AppColors.primaryGreen, size: 16),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          isBn ? 'ক্যামেরা (ছবি তুলুন)' : 'Take Photo (Camera)',
+                                          style: GoogleFonts.notoSansBengali(fontSize: 13, fontWeight: FontWeight.w700),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      isBn ? 'ক্যামেরা (ছবি তুলুন)' : 'Take Photo (Camera)',
-                                      style: GoogleFonts.notoSansBengali(fontSize: 13, fontWeight: FontWeight.w700),
+                                  ),
+                                  const PopupMenuDivider(height: 1),
+                                  PopupMenuItem(
+                                    value: 'gallery',
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.lightGreen50,
+                                            borderRadius: BorderRadius.zero,
+                                            border: Border.all(color: AppColors.border),
+                                          ),
+                                          child: const Icon(Icons.photo_library_outlined, color: AppColors.primaryGreen, size: 16),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          isBn ? 'ছবি আপলোড (গ্যালারি)' : 'Upload Photo (Gallery)',
+                                          style: GoogleFonts.notoSansBengali(fontSize: 13, fontWeight: FontWeight.w700),
+                                        ),
+                                      ],
                                     ),
-                                  ],
+                                  ),
+                                  const PopupMenuDivider(height: 1),
+                                  PopupMenuItem(
+                                    value: 'file',
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 32,
+                                          height: 32,
+                                          decoration: BoxDecoration(
+                                            color: AppColors.lightGreen50,
+                                            borderRadius: BorderRadius.zero,
+                                            border: Border.all(color: AppColors.border),
+                                          ),
+                                          child: const Icon(Icons.attach_file, color: AppColors.primaryGreen, size: 16),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          isBn ? 'ফাইল / পিডিএফ আপলোড' : 'Upload File / PDF',
+                                          style: GoogleFonts.notoSansBengali(fontSize: 13, fontWeight: FontWeight.w700),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: AppColors.bgMuted,
+                                    borderRadius: BorderRadius.zero,
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  child: const Icon(Icons.add, size: 20, color: AppColors.textPrimary),
                                 ),
                               ),
-                              const PopupMenuDivider(height: 1),
-                              PopupMenuItem(
-                                value: 'gallery',
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 34,
-                                      height: 34,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.lightGreen50,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.photo_library_rounded, color: AppColors.primaryGreen, size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.zero,
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  child: TextField(
+                                    controller: controller,
+                                    style: GoogleFonts.notoSansBengali(fontSize: 13),
+                                    decoration: InputDecoration(
+                                      hintText: isBn ? 'কী সরকারি সেবা প্রয়োজন? লিখুন...' : 'Ask about government services...',
+                                      hintStyle: GoogleFonts.notoSansBengali(fontSize: 12.5, color: AppColors.textMuted),
+                                      isDense: true,
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 10),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      isBn ? 'ছবি আপলোড (গ্যালারি)' : 'Upload Photo (Gallery)',
-                                      style: GoogleFonts.notoSansBengali(fontSize: 13, fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
-                              const PopupMenuDivider(height: 1),
-                              PopupMenuItem(
-                                value: 'file',
-                                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      width: 34,
-                                      height: 34,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.lightGreen50,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.attach_file_rounded, color: AppColors.primaryGreen, size: 18),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      isBn ? 'ফাইল / পিডিএফ আপলোড' : 'Upload File / PDF',
-                                      style: GoogleFonts.notoSansBengali(fontSize: 13, fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () async {
+                                  final q = controller.text.trim();
+                                  if (q.isEmpty) return;
+                                  controller.clear();
+                                  final time = _currentTimeString(isBn);
+                                  _sharedMessages.add(ChatMessage(
+                                      id: 'u-',
+                                      isUser: true,
+                                      text: q,
+                                      time: time));
+                                  setModalState(() {});
+                                  final reply = await AgentService.getReply(
+                                      prompt: q, isBn: isBn);
+                                  _sharedMessages.add(ChatMessage(
+                                      id: 'a-',
+                                      isUser: false,
+                                      text: reply,
+                                      time: _currentTimeString(isBn)));
+                                  setModalState(() {});
+                                },
+                                borderRadius: BorderRadius.zero,
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: const BoxDecoration(
+                                    borderRadius: BorderRadius.zero,
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                  child: const Icon(
+                                    Icons.send,
+                                    size: 16,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ),
                             ],
-                            child: Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: AppColors.bgMuted,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: const Icon(Icons.add_rounded, size: 22, color: AppColors.textPrimary),
-                            ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: AppColors.bgMuted,
-                                borderRadius: BorderRadius.circular(24),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
-                              child: TextField(
-                                controller: controller,
-                                style: GoogleFonts.notoSansBengali(fontSize: 13),
-                                decoration: InputDecoration(
-                                  hintText: isBn ? 'বার্তা লিখুন...' : 'Message Jonobondhu AI...',
-                                  hintStyle: GoogleFonts.notoSansBengali(fontSize: 13, color: AppColors.textMuted),
-                                  isDense: true,
-                                  border: InputBorder.none,
-                                  enabledBorder: InputBorder.none,
-                                  focusedBorder: InputBorder.none,
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4, left: 2, right: 2),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  isBn ? 'ইন্টারফেস সংস্করণ ২.০' : 'Interface v2.0',
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 10,
+                                    color: AppColors.textMuted,
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          InkWell(
-                            onTap: () async {
-                              final q = controller.text.trim();
-                              if (q.isEmpty) return;
-                              controller.clear();
-                              final time = _currentTimeString(isBn);
-                              _sharedMessages.add(ChatMessage(
-                                  id: 'u-${DateTime.now().millisecondsSinceEpoch}',
-                                  isUser: true,
-                                  text: q,
-                                  time: time));
-                              setModalState(() {});
-                              final reply = await AgentService.getReply(
-                                  prompt: q, isBn: isBn);
-                              _sharedMessages.add(ChatMessage(
-                                  id: 'a-${DateTime.now().millisecondsSinceEpoch}',
-                                  isUser: false,
-                                  text: reply,
-                                  time: _currentTimeString(isBn)));
-                              setModalState(() {});
-                            },
-                            borderRadius: BorderRadius.circular(20),
-                            child: Container(
-                              width: 38,
-                              height: 38,
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: AppColors.primaryGreen,
-                              ),
-                              child: const Icon(
-                                Icons.arrow_upward_rounded,
-                                size: 20,
-                                color: Colors.white,
-                              ),
+                                Text(
+                                  isBn ? 'দিশারী জনবন্ধু সহায়ক' : 'Dishari Jonobondhu',
+                                  style: GoogleFonts.notoSansBengali(
+                                    fontSize: 10,
+                                    color: AppColors.textMuted,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -957,14 +1026,14 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                 height: sheetHeight,
                 decoration: const BoxDecoration(
                   color: AppColors.bgSurface,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                  borderRadius: BorderRadius.zero,
                   border: Border(
                     top: BorderSide(color: AppColors.primaryGreen, width: 3),
                   ),
                 ),
                 child: Column(
                   children: [
-                    // চ্যাট টাইটেল বার
+                    // চ্যাট টাইটেল বার (Windows 10 Flat)
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
@@ -980,21 +1049,13 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                           Row(
                             children: [
                               Container(
-                                width: 36,
-                                height: 36,
+                                width: 34,
+                                height: 34,
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.zero,
                                   border: Border.all(
-                                      color: AppColors.border, width: 1.5),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.05),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ],
+                                      color: AppColors.border, width: 1),
                                 ),
                                 padding: const EdgeInsets.all(4),
                                 child: SvgPicture.asset(
@@ -1066,22 +1127,22 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                             ],
                           ),
                           InkWell(
-                            borderRadius: BorderRadius.circular(20),
                             onTap: () {
                               _speech.stop();
                               _isListening = false;
                               Navigator.pop(modalContext);
                             },
                             child: Container(
-                              width: 32,
-                              height: 32,
-                              decoration: const BoxDecoration(
+                              width: 30,
+                              height: 30,
+                              decoration: BoxDecoration(
                                 color: AppColors.bgMuted,
-                                shape: BoxShape.circle,
+                                borderRadius: BorderRadius.zero,
+                                border: Border.all(color: AppColors.border),
                               ),
                               child: const Icon(
-                                Icons.close_rounded,
-                                size: 18,
+                                Icons.close,
+                                size: 16,
                                 color: AppColors.textSecondary,
                               ),
                             ),
@@ -1124,16 +1185,19 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 14, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.bgMuted,
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(4),
-                                        topRight: Radius.circular(18),
-                                        bottomLeft: Radius.circular(18),
-                                        bottomRight: Radius.circular(18),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.zero,
+                                      border: Border(
+                                        left: BorderSide(
+                                            color: AppColors.primaryGreen,
+                                            width: 3),
+                                        top: BorderSide(color: AppColors.border),
+                                        right:
+                                            BorderSide(color: AppColors.border),
+                                        bottom:
+                                            BorderSide(color: AppColors.border),
                                       ),
-                                      border:
-                                          Border.all(color: AppColors.border),
                                     ),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.min,
@@ -1181,21 +1245,19 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 ),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 10),
-                                decoration: const BoxDecoration(
+                                decoration: BoxDecoration(
                                   color: AppColors.primaryGreen,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: Radius.circular(18),
-                                    topRight: Radius.circular(18),
-                                    bottomLeft: Radius.circular(18),
-                                    bottomRight: Radius.circular(4),
-                                  ),
+                                  borderRadius: BorderRadius.zero,
+                                  border: Border.all(
+                                      color: const Color(0xFF004D38),
+                                      width: 1),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     if (msg.imageFile != null) ...[
                                       ClipRRect(
-                                        borderRadius: BorderRadius.circular(12),
+                                        borderRadius: BorderRadius.zero,
                                         child: Image.file(
                                           msg.imageFile!,
                                           width: double.infinity,
@@ -1234,13 +1296,13 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Container(
-                                  width: 30,
-                                  height: 30,
+                                  width: 28,
+                                  height: 28,
                                   margin:
                                       const EdgeInsets.only(right: 8, top: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    shape: BoxShape.circle,
+                                    borderRadius: BorderRadius.zero,
                                     border: Border.all(
                                         color: AppColors.border, width: 1),
                                   ),
@@ -1259,16 +1321,19 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                     ),
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 14, vertical: 10),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.bgMuted,
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(4),
-                                        topRight: Radius.circular(18),
-                                        bottomLeft: Radius.circular(18),
-                                        bottomRight: Radius.circular(18),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.zero,
+                                      border: Border(
+                                        left: BorderSide(
+                                            color: AppColors.primaryGreen,
+                                            width: 3),
+                                        top: BorderSide(color: AppColors.border),
+                                        right:
+                                            BorderSide(color: AppColors.border),
+                                        bottom:
+                                            BorderSide(color: AppColors.border),
                                       ),
-                                      border:
-                                          Border.all(color: AppColors.border),
                                     ),
                                     child: buildAiMessageContent(
                                       context,
@@ -1301,8 +1366,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 7),
                                 decoration: BoxDecoration(
-                                  color: AppColors.bgPage,
-                                  borderRadius: BorderRadius.circular(20),
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.zero,
                                   border: Border.all(color: AppColors.border),
                                 ),
                                 child: Text(
@@ -1342,14 +1407,14 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
                                   color: AppColors.lightGreen50,
-                                  borderRadius: BorderRadius.circular(16),
+                                  borderRadius: BorderRadius.zero,
                                   border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.3)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.zero,
                                       child: Image.file(_stagedImage!, width: 36, height: 36, fit: BoxFit.cover),
                                     ),
                                     const SizedBox(width: 8),
@@ -1381,9 +1446,9 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                               offset: const Offset(0, -180),
                               color: Colors.white,
                               elevation: 6,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                                side: const BorderSide(color: AppColors.border),
+                              shape: const RoundedRectangleBorder(
+                                borderRadius: BorderRadius.zero,
+                                side: BorderSide(color: AppColors.border),
                               ),
                               onSelected: (val) => _handleAttachmentOption(val, modalContext),
                               itemBuilder: (ctx) => [
@@ -1521,12 +1586,12 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 height: 36,
                                 decoration: BoxDecoration(
                                   color: AppColors.bgMuted,
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.zero,
                                   border: Border.all(color: AppColors.border),
                                 ),
                                 child: const Icon(
-                                  Icons.add_rounded,
-                                  size: 22,
+                                  Icons.add,
+                                  size: 20,
                                   color: AppColors.textPrimary,
                                 ),
                               ),
@@ -1534,12 +1599,12 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
 
                             const SizedBox(width: 8),
 
-                            // টেক্সট ইনপুট ক্যাপসুল (ChatGPT-র মতো গোল বর্ডার)
+                            // টেক্সট ইনপুট (Windows 10 Flat Modern UI - চারকোনা শেপ)
                             Expanded(
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: AppColors.bgMuted,
-                                  borderRadius: BorderRadius.circular(24),
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.zero,
                                   border: Border.all(
                                     color: _isListening
                                         ? Colors.red
@@ -1547,7 +1612,7 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                     width: 1,
                                   ),
                                 ),
-                                padding: const EdgeInsets.symmetric(horizontal: 14),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
                                 child: Row(
                                   children: [
                                     Expanded(
@@ -1560,10 +1625,10 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                                   ? 'শুনছি... বলুন'
                                                   : 'Listening... speak now')
                                               : (isBn
-                                                  ? 'বার্তা লিখুন...'
-                                                  : 'Message Jonobondhu AI...'),
+                                                  ? 'কী সরকারি সেবা প্রয়োজন? লিখুন...'
+                                                  : 'Ask about government services...'),
                                           hintStyle: GoogleFonts.notoSansBengali(
-                                            fontSize: 13,
+                                            fontSize: 12.5,
                                             color: AppColors.textMuted,
                                           ),
                                           isDense: true,
@@ -1577,26 +1642,29 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                       ),
                                     ),
 
-                                    // 🎤 গোল ভয়েস বাটন
+                                    // 🎤 স্কয়ার ভয়েস বাটন
                                     InkWell(
                                       onTap: _toggleVoiceInput,
-                                      borderRadius: BorderRadius.circular(20),
+                                      borderRadius: BorderRadius.zero,
                                       child: Container(
-                                        width: 28,
-                                        height: 28,
+                                        width: 30,
+                                        height: 30,
                                         decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
+                                          borderRadius: BorderRadius.zero,
                                           color: _isListening
-                                              ? Colors.red
+                                              ? Colors.red.withValues(alpha: 0.15)
                                               : Colors.transparent,
+                                          border: _isListening
+                                              ? Border.all(color: Colors.red)
+                                              : null,
                                         ),
                                         child: Icon(
                                           _isListening
-                                              ? Icons.stop_rounded
+                                              ? Icons.mic_off
                                               : Icons.mic_rounded,
-                                          size: 19,
+                                          size: 18,
                                           color: _isListening
-                                              ? Colors.white
+                                              ? Colors.red
                                               : AppColors.textSecondary,
                                         ),
                                       ),
@@ -1608,25 +1676,47 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
 
                             const SizedBox(width: 8),
 
-                            // গোল সেন্ড বাটন (ChatGPT-র মতো গোল সবুজ সার্কেলে সাদা তীর)
+                            // স্কয়ার সেন্ড বাটন (Windows 10 Flat Square Shape - সবুজ ব্যাকগ্রাউন্ড)
                             InkWell(
                               onTap: () => _sendMessage(),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.zero,
                               child: Container(
-                                width: 38,
-                                height: 38,
+                                width: 36,
+                                height: 36,
                                 decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
+                                  borderRadius: BorderRadius.zero,
                                   color: AppColors.primaryGreen,
                                 ),
                                 child: const Icon(
-                                  Icons.arrow_upward_rounded,
-                                  size: 20,
+                                  Icons.send,
+                                  size: 16,
                                   color: Colors.white,
                                 ),
                               ),
                             ),
                           ],
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4, left: 2, right: 2),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                isBn ? 'ইন্টারফেস সংস্করণ ২.০' : 'Interface v2.0',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 10,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                              Text(
+                                isBn ? 'দিশারী জনবন্ধু সহায়ক' : 'Dishari Jonobondhu',
+                                style: GoogleFonts.notoSansBengali(
+                                  fontSize: 10,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
