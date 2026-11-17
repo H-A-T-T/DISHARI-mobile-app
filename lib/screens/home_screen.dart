@@ -6,14 +6,13 @@ import '../providers/language_provider.dart';
 import '../providers/services_provider.dart';
 import '../widgets/home/hero_section.dart';
 import '../widgets/home/stats_section.dart';
-import '../widgets/home/ai_teaser.dart';
 import '../widgets/home/weather_advisory.dart';
 import '../widgets/home/category_grid.dart';
 import '../widgets/home/featured_services.dart';
 import '../widgets/home/how_it_works.dart';
+import '../widgets/common/footer_widget.dart';
 import 'service_detail_screen.dart';
 import 'opportunities_screen.dart';
-import 'about_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final Function(int targetTab) onNavigateTab;
@@ -34,7 +33,7 @@ class HomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Hero Section
+          // 1. Hero Section (Search & Direct Autocomplete)
           HeroSection(
             onSelectService: (slug) {
               Navigator.push(
@@ -51,19 +50,15 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // Stats Section (Windows 10 Flat Metric Tiles)
+          // 2. Stats Section (Windows 10 Flat Metric Tiles)
           const StatsSection(),
           const SizedBox(height: 8),
 
-          // Jonobondhu AI Citizen Assistant Banner Card
-          const AiTeaser(),
-          const SizedBox(height: 8),
-
-          // Weather & Rural Civic Advisory
+          // 3. Weather & Rural Civic Advisory (Mirrors web WeatherAdvisory.tsx)
           const WeatherAdvisory(),
           const SizedBox(height: 8),
 
-          // Categories Grid
+          // 4. Categories Grid (Mirrors web CategoryGrid.tsx)
           CategoryGrid(
             onSelectCategory: (slug) {
               servicesProvider.setCategory(slug);
@@ -76,7 +71,11 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // Featured Popular Services
+          // 5. How It Works Flow (Mirrors web HowItWorks.tsx)
+          const HowItWorks(),
+          const SizedBox(height: 8),
+
+          // 6. Featured Popular Services (Mirrors web FeaturedServices.tsx)
           FeaturedServices(
             onSelectService: (slug) {
               Navigator.push(
@@ -93,7 +92,7 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // Government Opportunities Banner
+          // 7. Government Opportunities Banner
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(16),
@@ -176,86 +175,11 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
 
-          // How It Works Flow
-          const HowItWorks(),
-          const SizedBox(height: 8),
+          // 8. Full 3-Column Footer matching web Footer.tsx
+          FooterWidget(onNavigateTab: onNavigateTab),
 
-          // Footer Info Box
-          Container(
-            color: AppColors.darkGreen,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(height: 2, color: AppColors.primaryRed),
-                const SizedBox(height: 14),
-                Text(
-                  isBn
-                      ? 'দিশারী — ডিজিটাল নাগরিক সহায়ক'
-                      : 'Dishari — Digital Citizen Assistant',
-                  style: GoogleFonts.notoSansBengali(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  langProvider.t('footer.mission'),
-                  style: GoogleFonts.notoSansBengali(
-                    fontSize: 11,
-                    color: const Color(0xFFD1FAE5),
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AboutScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF065F46),
-                      border: Border.all(color: const Color(0xFF10B981), width: 0.8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          isBn ? 'আমাদের লক্ষ্য ও পরিচিতি' : 'Our Mission & About Dishari',
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        const Icon(Icons.arrow_forward_rounded, size: 12, color: Colors.white),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Divider(color: Color(0xFF065F46)),
-                const SizedBox(height: 10),
-                Text(
-                  langProvider.t('footer.copyright'),
-                  style: GoogleFonts.notoSansBengali(
-                    fontSize: 10,
-                    color: const Color(0xFFA7F3D0),
-                  ),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 70), // Bottom nav bar breathing space
         ],
       ),
