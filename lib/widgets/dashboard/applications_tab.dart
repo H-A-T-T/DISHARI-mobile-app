@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../config/constants.dart';
 import '../../models/application.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../screens/services_screen.dart';
+import '../../services/url_service.dart';
 import '../common/jonobondhu_chat_overlay.dart';
 
 class ApplicationsTab extends StatelessWidget {
@@ -28,12 +28,7 @@ class ApplicationsTab extends StatelessWidget {
   }
 
   Future<void> _openPortal(String? url) async {
-    if (url != null && url.isNotEmpty && url != '#') {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
+    await UrlService.openUrl(url);
   }
 
   void _showDocketSlipDialog(BuildContext context, CitizenApplication app, bool isBn) {

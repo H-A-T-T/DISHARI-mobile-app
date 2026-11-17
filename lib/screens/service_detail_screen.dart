@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../config/constants.dart';
 import '../models/service.dart';
 import '../providers/auth_provider.dart';
@@ -9,6 +8,7 @@ import '../providers/dashboard_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/services_provider.dart';
 import '../services/api_service.dart';
+import '../services/url_service.dart';
 import '../widgets/services/application_modal.dart';
 import '../widgets/services/smart_bag_checker.dart';
 
@@ -57,12 +57,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   }
 
   Future<void> _openOfficialPortal(String url) async {
-    if (url.isNotEmpty) {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
+    await UrlService.openUrl(url);
   }
 
   @override

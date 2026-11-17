@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../config/constants.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../screens/service_detail_screen.dart';
+import '../../services/url_service.dart';
 
 class DeadlinesTab extends StatefulWidget {
   const DeadlinesTab({super.key});
@@ -19,12 +19,7 @@ class _DeadlinesTabState extends State<DeadlinesTab> {
   String _selectedCategory = 'all';
 
   Future<void> _openLink(String? url) async {
-    if (url != null && url.isNotEmpty) {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
+    await UrlService.openUrl(url);
   }
 
   @override

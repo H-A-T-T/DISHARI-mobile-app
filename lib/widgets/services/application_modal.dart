@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../config/constants.dart';
 import '../../models/service.dart';
 import '../../models/document.dart';
@@ -9,6 +8,7 @@ import '../../models/application.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/language_provider.dart';
+import '../../services/url_service.dart';
 
 class ApplicationModal extends StatefulWidget {
   final Service service;
@@ -181,13 +181,7 @@ class _ApplicationModalState extends State<ApplicationModal> {
   }
 
   Future<void> _openOfficialPortal() async {
-    final url = widget.service.officialUrl;
-    if (url.isNotEmpty && url != '#') {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
+    await UrlService.openUrl(widget.service.officialUrl);
   }
 
   void _showDocketSlipDialog(CitizenApplication app, bool isBn) {

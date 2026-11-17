@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../config/constants.dart';
 import '../models/opportunity.dart';
 import '../providers/language_provider.dart';
 import 'service_detail_screen.dart';
+import '../services/url_service.dart';
 
 class OpportunitiesScreen extends StatefulWidget {
   final bool isEmbedded;
@@ -43,12 +43,7 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
   }
 
   Future<void> _openOfficialLink(String? url) async {
-    if (url != null && url.isNotEmpty) {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
-    }
+    await UrlService.openUrl(url);
   }
 
   @override
