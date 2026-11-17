@@ -5,153 +5,218 @@ import 'package:http/http.dart' as http;
 import '../config/env.dart';
 
 class N8nService {
-  /// Sends the image to the n8n webhook (or falls back to direct Gemini model)
-  /// matching Capture_image_info.json
+  /// Sends the image to n8n webhook, then backend OCR (/api/documents/scan-ocr),
+  /// and Gemini AI. Never returns fake hardcoded template data.
   static Future<Map<String, dynamic>> extractImageInfo({
     required File imageFile,
     String? customWebhookUrl,
+    String? docType,
   }) async {
-    final webhookUrl = (customWebhookUrl != null && customWebhookUrl.trim().isNotEmpty)
-        ? customWebhookUrl.trim()
-        : EnvConfig.n8nWebhookUrl;
-
-    // 1. Try sending to n8n webhook as multipart/form-data with binary field 'file'
-    try {
-      debugPrint('N8nService: Sending image to n8n webhook: $webhookUrl');
-      final uri = Uri.parse(webhookUrl);
-      final request = http.MultipartRequest('POST', uri);
-
-      // Add binary file matching n8n node: binaryPropertyName = "file"
-      final multipartFile = await http.MultipartFile.fromPath(
-        'file',
-        imageFile.path,
-      );
-      request.files.add(multipartFile);
-
-      final streamedResponse = await request.send().timeout(const Duration(seconds: 25));
-      final response = await http.Response.fromStream(streamedResponse);
-
-      debugPrint('N8nService: n8n response code ${response.statusCode}: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map<String, dynamic>) {
-          if (decoded['success'] == true && decoded['document'] != null) {
-            final doc = decoded['document'];
-            if (doc is Map<String, dynamic>) {
-              return {'success': true, 'data': doc, 'source': 'n8n'};
-            } else if (doc is String) {
-              return {'success': true, 'data': {'rawText': doc}, 'source': 'n8n'};
-            }
-          } else if (decoded.containsKey('Name') || decoded.containsKey('name') || decoded.containsKey('id')) {
-            return {'success': true, 'data': decoded, 'source': 'n8n'};
-          }
-        }
-      }
-    } catch (e) {
-      debugPrint('N8nService: n8n webhook failed or unreachable: $e');
+    final fileName = imageFile.path.split(Platform.pathSeparator).last;
+    final bytes = await imageFile.readAsBytes();
+    final base64Image = base64Encode(bytes);
+    final filenameLower = fileName.toLowerCase();
+    String mimeType = 'image/jpeg';
+    if (filenameLower.endsWith('.png')) {
+      mimeType = 'image/png';
+    } else if (filenameLower.endsWith('.webp')) {
+      mimeType = 'image/webp';
     }
 
-    // 2. Direct Gemini Fallback if n8n is offline or unreachable
-    // Using the same Gemini prompt from Capture_image_info.json
-    try {
-      debugPrint('N8nService: Attempting direct Gemini Vision analysis fallback');
-      final bytes = await imageFile.readAsBytes();
-      final base64Image = base64Encode(bytes);
-      final filename = imageFile.path.toLowerCase();
-      String mimeType = 'image/jpeg';
-      if (filename.endsWith('.png')) {
-        mimeType = 'image/png';
-      } else if (filename.endsWith('.webp')) {
-        mimeType = 'image/webp';
+    // ─── 1. TRY N8N WEBHOOK ────────────────────────────────────────────────
+    final n8nEndpoints = <String>{
+      if (customWebhookUrl != null && customWebhookUrl.trim().isNotEmpty)
+        customWebhookUrl.trim(),
+      if (EnvConfig.n8nWebhookUrl.isNotEmpty) EnvConfig.n8nWebhookUrl,
+      'http://localhost:5678/webhook/extract-image',
+      'http://10.0.2.2:5678/webhook/extract-image',
+      'http://localhost:5678/webhook-test/extract-image',
+      'http://10.0.2.2:5678/webhook-test/extract-image',
+    }.toList();
+
+    for (final endpoint in n8nEndpoints) {
+      try {
+        debugPrint('N8nService: Probing n8n endpoint: $endpoint');
+        final uri = Uri.parse(endpoint);
+
+        // Try multipart upload (matching n8n binaryPropertyName = "file")
+        final request = http.MultipartRequest('POST', uri);
+        request.files.add(
+          http.MultipartFile.fromBytes('file', bytes, filename: fileName),
+        );
+        request.fields['imagebase64'] = base64Image;
+        request.fields['mimeType'] = mimeType;
+        request.fields['fileName'] = fileName;
+
+        final streamedRes =
+            await request.send().timeout(const Duration(seconds: 4));
+        final res = await http.Response.fromStream(streamedRes);
+
+        if (res.statusCode == 200 && res.body.isNotEmpty) {
+          debugPrint('N8nService: n8n responded: ${res.body}');
+          final decoded = jsonDecode(res.body);
+          if (decoded is Map<String, dynamic>) {
+            if (decoded['success'] == true && decoded['document'] != null) {
+              final doc = decoded['document'];
+              if (doc is Map<String, dynamic>) {
+                return {'success': true, 'data': doc, 'source': 'n8n'};
+              }
+            } else if (decoded.containsKey('Name') ||
+                decoded.containsKey('name') ||
+                decoded.containsKey('id_number') ||
+                decoded.containsKey('idNumber')) {
+              return {'success': true, 'data': decoded, 'source': 'n8n'};
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('N8nService: Endpoint $endpoint failed or offline: $e');
       }
+    }
 
-      final apiKey = EnvConfig.geminiApiKey;
+    // ─── 2. TRY DISHARI BACKEND OCR (/api/documents/scan-ocr) ──────────────
+    final backendEndpoints = <String>{
+      '${EnvConfig.apiBaseUrl}/documents/scan-ocr',
+      'http://localhost:5000/api/documents/scan-ocr',
+      'http://10.0.2.2:5000/api/documents/scan-ocr',
+    }.toList();
 
-      final geminiUri = Uri.parse(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey',
-      );
+    for (final bEndpoint in backendEndpoints) {
+      try {
+        debugPrint('N8nService: Trying backend OCR endpoint: $bEndpoint');
+        final res = await http
+            .post(
+              Uri.parse(bEndpoint),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({
+                'imageBase64': base64Image,
+                'mimeType': mimeType,
+                'docType': docType ?? 'nid_front',
+                'fileName': fileName,
+              }),
+            )
+            .timeout(const Duration(seconds: 4));
 
-      final requestBody = jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {
-                'text':
-                    'Extract all text and details from this Bangladeshi citizen ID card or document (such as Name, Bengali Name, NID/ID Number, Date of Birth, Father Name, Mother Name, Blood Group, Address, Issue Date, Validity) and return strictly a valid JSON object with key-value pairs in English/Bengali.',
-              },
-              {
-                'inline_data': {
-                  'mime_type': mimeType,
-                  'data': base64Image,
+        if (res.statusCode == 200 && res.body.isNotEmpty) {
+          final decoded = jsonDecode(res.body);
+          if (decoded is Map<String, dynamic> && decoded['document'] != null) {
+            final doc = decoded['document'];
+            if (doc is Map<String, dynamic> &&
+                (doc.containsKey('id_number') ||
+                    doc.containsKey('full_name_bn') ||
+                    doc.containsKey('dob') ||
+                    doc.containsKey('doc_title'))) {
+              return {
+                'success': true,
+                'data': doc,
+                'source': decoded['source'] ?? 'backend_ocr',
+              };
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('N8nService: Backend OCR endpoint $bEndpoint error: $e');
+      }
+    }
+
+    // ─── 3. TRY DIRECT GEMINI VISION API ───────────────────────────────────
+    final apiKey = EnvConfig.geminiApiKey;
+    if (apiKey.isNotEmpty && apiKey.startsWith('AIza')) {
+      try {
+        debugPrint('N8nService: Trying direct Gemini Vision API');
+        final geminiUri = Uri.parse(
+          'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=$apiKey',
+        );
+
+        final requestBody = jsonEncode({
+          'contents': [
+            {
+              'parts': [
+                {
+                  'text':
+                      'Extract all text and details from this Bangladeshi citizen ID card or document (such as Name, Bengali Name, NID/ID Number, Date of Birth, Father Name, Mother Name, Blood Group, Address, Issue Date) and return strictly a valid JSON object with key-value pairs without markdown code blocks.',
+                },
+                {
+                  'inline_data': {
+                    'mime_type': mimeType,
+                    'data': base64Image,
+                  }
+                }
+              ]
+            }
+          ]
+        });
+
+        final geminiRes = await http
+            .post(
+              geminiUri,
+              headers: {'Content-Type': 'application/json'},
+              body: requestBody,
+            )
+            .timeout(const Duration(seconds: 10));
+
+        if (geminiRes.statusCode == 200) {
+          final decoded = jsonDecode(geminiRes.body);
+          final candidates = decoded['candidates'] as List?;
+          if (candidates != null && candidates.isNotEmpty) {
+            final parts = candidates[0]['content']?['parts'] as List?;
+            if (parts != null && parts.isNotEmpty) {
+              final text = parts[0]['text']?.toString() ?? '';
+              final jsonMatch = RegExp(r'```(?:json)?\s*([\s\S]*?)```',
+                      caseSensitive: false)
+                  .firstMatch(text);
+              String jsonText = '';
+              if (jsonMatch != null) {
+                jsonText = jsonMatch.group(1)!.trim();
+              } else {
+                final start = text.indexOf('{');
+                final end = text.lastIndexOf('}');
+                if (start != -1 && end != -1) {
+                  jsonText = text.substring(start, end + 1);
                 }
               }
-            ]
-          }
-        ]
-      });
 
-      final geminiRes = await http
-          .post(
-            geminiUri,
-            headers: {'Content-Type': 'application/json'},
-            body: requestBody,
-          )
-          .timeout(const Duration(seconds: 25));
-
-      if (geminiRes.statusCode == 200) {
-        final decoded = jsonDecode(geminiRes.body);
-        final candidates = decoded['candidates'] as List?;
-        if (candidates != null && candidates.isNotEmpty) {
-          final parts = candidates[0]['content']?['parts'] as List?;
-          if (parts != null && parts.isNotEmpty) {
-            final text = parts[0]['text']?.toString() ?? '';
-            // Parse JSON block
-            final jsonMatch = RegExp(r'```(?:json)?\s*([\s\S]*?)```', caseSensitive: false).firstMatch(text);
-            String jsonText = '';
-            if (jsonMatch != null) {
-              jsonText = jsonMatch.group(1)!.trim();
-            } else {
-              final start = text.indexOf('{');
-              final end = text.lastIndexOf('}');
-              if (start != -1 && end != -1) {
-                jsonText = text.substring(start, end + 1);
+              if (jsonText.isNotEmpty) {
+                final parsedDoc = jsonDecode(jsonText);
+                if (parsedDoc is Map<String, dynamic>) {
+                  return {
+                    'success': true,
+                    'data': parsedDoc,
+                    'source': 'gemini_vision',
+                  };
+                }
               }
             }
-
-            if (jsonText.isNotEmpty) {
-              final parsedDoc = jsonDecode(jsonText);
-              if (parsedDoc is Map<String, dynamic>) {
-                return {'success': true, 'data': parsedDoc, 'source': 'gemini'};
-              }
-            }
-
-            return {
-              'success': true,
-              'data': {'extractedText': text},
-              'source': 'gemini',
-            };
           }
         }
+      } catch (e) {
+        debugPrint('N8nService: Gemini direct call failed: $e');
       }
-    } catch (e) {
-      debugPrint('N8nService: Gemini fallback error: $e');
     }
 
-    // 3. Simulated structured fallback if no internet or model error
+    // ─── 4. REAL DOCUMENT SKELETON (NO FAKE TEMPLATE DATA) ─────────────────
+    // Instead of fake person "Mohammad Karim / 7392819283719", we return
+    // real metadata derived from the uploaded file so user can review and edit.
+    final docTitles = {
+      'nid_front': 'গণপ্রজাতন্ত্রী বাংলাদেশ সরকার - জাতীয় পরিচয়পত্র',
+      'nid_back': 'জাতীয় পরিচয়পত্র (পেছনের অংশ)',
+      'birth_certificate': 'জন্ম ও মৃত্যু নিবন্ধন কার্যালয় - জন্ম নিবন্ধন সনদ',
+      'educational_transcript': 'শিক্ষা বোর্ড - প্রবেশপত্র / শিক্ষাগত সনদ',
+      'tin_certificate': 'জাতীয় রাজস্ব বোর্ড (NBR) - ই-টিআইএন সনদ',
+      'trade_license': 'সিটি কর্পোরেশন / পৌরসভা - ই-ট্রেড লাইসেন্স',
+      'citizenship_certificate': 'ইউনিয়ন পরিষদ / পৌরসভা - নাগরিকত্ব সনদ',
+      'photo': 'পাসপোর্ট সাইজ ছবি',
+    };
+
     return {
       'success': true,
       'data': {
-        'name': 'মোহাম্মদ করিম (Md. Karim)',
-        'idNumber': '7392819283719',
-        'dob': '15 Mar 1992',
-        'bloodGroup': 'B+',
-        'fatherName': 'আনোয়ার হোসেন',
-        'motherName': 'ফাতেমা বেগম',
-        'address': 'বাড়ি-১২, রোড-৪, মিরপুর-১০, ঢাকা-১২১৬',
-        'documentType': 'Smart National ID',
+        'doc_title': docTitles[docType] ?? 'ডিজিটাল সংরক্ষিত নাগরিক নথি',
+        'file_name': fileName,
+        'scanned_at': DateTime.now().toIso8601String(),
+        'status': 'তথ্য পর্যালোচনা ও যাচাই করুন',
       },
-      'source': 'offline_mock',
+      'source': 'real_file_metadata',
     };
   }
 }

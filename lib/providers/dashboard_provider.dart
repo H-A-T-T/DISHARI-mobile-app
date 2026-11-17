@@ -182,6 +182,7 @@ class DashboardProvider extends ChangeNotifier {
   void addVerifiedDocument(CitizenDocument doc) {
     _documents.removeWhere((d) => d.id == doc.id || (d.docType == doc.docType && d.fileName == doc.fileName));
     _documents.insert(0, doc);
+    StorageService.saveDocuments(_documents);
     notifyListeners();
   }
 
@@ -230,6 +231,7 @@ class DashboardProvider extends ChangeNotifier {
 
       if (res.success && res.application != null) {
         _applications.insert(0, res.application!);
+        StorageService.saveApplications(_applications);
         _isLoading = false;
         notifyListeners();
         return (success: true, application: res.application, error: null);

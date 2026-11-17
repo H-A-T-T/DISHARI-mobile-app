@@ -22,6 +22,10 @@ class DocumentLockerTab extends StatefulWidget {
 }
 
 class _DocumentLockerTabState extends State<DocumentLockerTab> {
+  String _activeFolder = 'all';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
   final List<({String type, String nameBn, String nameEn, bool required})> _docTypes = [
     (type: 'nid_front', nameBn: 'জাতীয় পরিচয়পত্র (সামনে)', nameEn: 'National ID (Front)', required: true),
     (type: 'nid_back', nameBn: 'জাতীয় পরিচয়পত্র (পেছনে)', nameEn: 'National ID (Back)', required: true),
@@ -32,433 +36,449 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
     (type: 'citizenship_certificate', nameBn: 'নাগরিকত্ব সনদপত্র', nameEn: 'Citizenship Certificate', required: false),
   ];
 
-void _showUploadDialog() {
-  final langProvider =
-      Provider.of<LanguageProvider>(context, listen: false);
-  final isBn = langProvider.isBn;
+  final List<({String id, String nameBn, String nameEn, List<String> docTypes})> _folders = [
+    (id: 'all', nameBn: 'সকল নথি', nameEn: 'All Documents', docTypes: []),
+    (id: 'identity', nameBn: 'জাতীয় পরিচয় ও ছবি', nameEn: 'Identity & Photos', docTypes: ['nid_front', 'nid_back', 'photo', 'citizenship_certificate']),
+    (id: 'vital', nameBn: 'জন্ম নিবন্ধন', nameEn: 'Birth & Vital', docTypes: ['birth_certificate']),
+    (id: 'education', nameBn: 'শিক্ষা ও প্রবেশপত্র', nameEn: 'Education', docTypes: ['educational_transcript']),
+    (id: 'business', nameBn: 'ট্রেড লাইসেন্স', nameEn: 'Business & Trade', docTypes: ['trade_license']),
+    (id: 'tax', nameBn: 'কর ও রাজস্ব', nameEn: 'Tax & e-TIN', docTypes: ['tin_certificate']),
+  ];
 
-  String selectedType = _docTypes.first.type;
-
-  // নির্বাচিত আসল file-এর তথ্য
-  File? selectedLocalFile;
-  String? selectedFileName;
-  int selectedFileSize = 0;
-  String selectedMimeType = 'application/octet-stream';
-
-  showDialog(
-    context: context,
-    builder: (ctx) {
-      return StatefulBuilder(
-        builder: (context, setDialogState) {
-          // Camera দিয়ে Scan এবং AI যাচাই
-          Future<void> scanDocumentWithAi() async {
-            final picker = ImagePicker();
-
-            final XFile? image = await picker.pickImage(
-              source: ImageSource.camera,
-              imageQuality: 90,
-            );
-
-            if (image != null && context.mounted) {
-              final file = File(image.path);
-              Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ImageVerificationScreen(
-                    initialImageFile: file,
-                    initialDocType: selectedType,
-                  ),
-                ),
-              );
-            }
-          }
-
-          // Gallery থেকে ছবি নির্বাচন এবং AI যাচাই
-          Future<void> galleryDocumentWithAi() async {
-            final picker = ImagePicker();
-
-            final XFile? image = await picker.pickImage(
-              source: ImageSource.gallery,
-              imageQuality: 90,
-            );
-
-            if (image != null && context.mounted) {
-              final file = File(image.path);
-              Navigator.pop(ctx);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ImageVerificationScreen(
-                    initialImageFile: file,
-                    initialDocType: selectedType,
-                  ),
-                ),
-              );
-            }
-          }
-
-          // File Explorer থেকে যেকোনো file নির্বাচন
-         Future<void> uploadFile() async {
-           final platformFile = await FilePicker.pickFile(
-             type: FileType.any,
-           );
-
-  if (platformFile != null && platformFile.path != null) {
-    final file = File(platformFile.path!);
-
-    setDialogState(() {
-      selectedLocalFile = file;
-      selectedFileName = platformFile.name;
-      selectedFileSize = file.lengthSync();
-
-      // PDF/Image অনুযায়ী MIME type
-      final name = platformFile.name.toLowerCase();
-
-      if (name.endsWith('.pdf')) {
-        selectedMimeType = 'application/pdf';
-      } else if (name.endsWith('.png')) {
-        selectedMimeType = 'image/png';
-      } else if (name.endsWith('.jpg') || name.endsWith('.jpeg')) {
-        selectedMimeType = 'image/jpeg';
-      } else {
-        selectedMimeType = 'application/octet-stream';
-      }
-    });
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
-}
 
-          return AlertDialog(
-            backgroundColor: AppColors.bgSurface,
-            shape: const RoundedRectangleBorder(),
+  void _showUploadDialog() {
+    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final isBn = langProvider.isBn;
 
-            // এই লেখা অপরিবর্তিত থাকবে
-            title: Text(
-              isBn
-                  ? 'নতুন নথি লকারে সংরক্ষণ করুন'
-                  : 'Add Document to Locker',
-              style: GoogleFonts.notoSansBengali(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+    String selectedType = _docTypes.first.type;
+    File? selectedLocalFile;
+    String? selectedFileName;
+    int selectedFileSize = 0;
+    String selectedMimeType = 'application/octet-stream';
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            Future<void> scanDocumentWithAi() async {
+              final picker = ImagePicker();
+              final XFile? image = await picker.pickImage(
+                source: ImageSource.camera,
+                imageQuality: 90,
+              );
+
+              if (image != null && context.mounted) {
+                final file = File(image.path);
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ImageVerificationScreen(
+                      initialImageFile: file,
+                      initialDocType: selectedType,
+                    ),
+                  ),
+                );
+              }
+            }
+
+            Future<void> galleryDocumentWithAi() async {
+              final picker = ImagePicker();
+              final XFile? image = await picker.pickImage(
+                source: ImageSource.gallery,
+                imageQuality: 90,
+              );
+
+              if (image != null && context.mounted) {
+                final file = File(image.path);
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ImageVerificationScreen(
+                      initialImageFile: file,
+                      initialDocType: selectedType,
+                    ),
+                  ),
+                );
+              }
+            }
+
+            Future<void> uploadFile() async {
+              final platformFile = await FilePicker.pickFile(
+                type: FileType.any,
+              );
+
+              if (platformFile != null && platformFile.path != null) {
+                final file = File(platformFile.path!);
+
+                setDialogState(() {
+                  selectedLocalFile = file;
+                  selectedFileName = platformFile.name;
+                  selectedFileSize = file.lengthSync();
+
+                  final name = platformFile.name.toLowerCase();
+                  if (name.endsWith('.pdf')) {
+                    selectedMimeType = 'application/pdf';
+                  } else if (name.endsWith('.png')) {
+                    selectedMimeType = 'image/png';
+                  } else if (name.endsWith('.jpg') || name.endsWith('.jpeg')) {
+                    selectedMimeType = 'image/jpeg';
+                  } else {
+                    selectedMimeType = 'application/octet-stream';
+                  }
+                });
+              }
+            }
+
+            return AlertDialog(
+              backgroundColor: AppColors.bgSurface,
+              shape: const RoundedRectangleBorder(),
+              title: Text(
+                isBn ? 'নতুন নথি লকারে সংরক্ষণ করুন' : 'Add Document to Locker',
+                style: GoogleFonts.notoSansBengali(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
-
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // এই লেখা অপরিবর্তিত থাকবে
-                  Text(
-                    isBn
-                        ? 'নথির ধরন নির্বাচন করুন:'
-                        : 'Select Document Type:',
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  // Document Type Dropdown অপরিবর্তিত
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedType,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isBn ? 'নথির ধরন নির্বাচন করুন:' : 'Select Document Type:',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
                       ),
                     ),
-                    items: _docTypes.map((dt) {
-                      return DropdownMenuItem(
-                        value: dt.type,
-                        child: Text(
-                          isBn ? dt.nameBn : dt.nameEn,
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 12,
+                    const SizedBox(height: 8),
+
+                    DropdownButtonFormField<String>(
+                      initialValue: selectedType,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      ),
+                      items: _docTypes.map((dt) {
+                        return DropdownMenuItem(
+                          value: dt.type,
+                          child: Text(
+                            isBn ? dt.nameBn : dt.nameEn,
+                            style: GoogleFonts.notoSansBengali(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setDialogState(() {
-                          selectedType = val;
-                        });
-                      }
-                    },
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // নতুন Scan এবং Upload File option
-                  Text(
-                    isBn
-                        ? 'নথি যোগ করার পদ্ধতি নির্বাচন করুন:'
-                        : 'Choose how to add your document:',
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
+                        );
+                      }).toList(),
+                      onChanged: (val) {
+                        if (val != null) {
+                          setDialogState(() => selectedType = val);
+                        }
+                      },
                     ),
-                  ),
+                    const SizedBox(height: 16),
 
-                  const SizedBox(height: 8),
+                    Text(
+                      isBn ? 'নথি যোগ করার পদ্ধতি নির্বাচন করুন:' : 'Choose how to add your document:',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
 
-                  Row(
-                    children: [
-                      // Camera Scan Button (AI)
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: scanDocumentWithAi,
-                          icon: const Icon(
-                            Icons.camera_alt_outlined,
-                            size: 16,
-                          ),
-                          label: Text(
-                            isBn ? 'ক্যামেরা (AI)' : 'Camera (AI)',
-                            style: GoogleFonts.notoSansBengali(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: scanDocumentWithAi,
+                            icon: const Icon(Icons.camera_alt_outlined, size: 14),
+                            label: Text(
+                              isBn ? 'ক্যামেরা (AI)' : 'Camera (AI)',
+                              style: GoogleFonts.notoSansBengali(fontSize: 10, fontWeight: FontWeight.w700),
                             ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                              shape: const RoundedRectangleBorder(),
+                            ),
                           ),
                         ),
-                      ),
-
-                      const SizedBox(width: 6),
-
-                      // Gallery Button (AI)
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: galleryDocumentWithAi,
-                          icon: const Icon(
-                            Icons.photo_library_outlined,
-                            size: 16,
-                          ),
-                          label: Text(
-                            isBn ? 'গ্যালারি (AI)' : 'Gallery (AI)',
-                            style: GoogleFonts.notoSansBengali(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: galleryDocumentWithAi,
+                            icon: const Icon(Icons.photo_library_outlined, size: 14),
+                            label: Text(
+                              isBn ? 'গ্যালারি (AI)' : 'Gallery (AI)',
+                              style: GoogleFonts.notoSansBengali(fontSize: 10, fontWeight: FontWeight.w700),
                             ),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                              shape: const RoundedRectangleBorder(),
+                            ),
                           ),
                         ),
-                      ),
-
-                      const SizedBox(width: 6),
-
-                      // Upload File Button
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: uploadFile,
-                          icon: const Icon(
-                            Icons.upload_file_outlined,
-                            size: 16,
-                          ),
-                          label: Text(
-                            isBn ? 'ফাইল/PDF' : 'PDF/File',
-                            style: GoogleFonts.notoSansBengali(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: uploadFile,
+                            icon: const Icon(Icons.upload_file_outlined, size: 14),
+                            label: Text(
+                              isBn ? 'ফাইল/PDF' : 'PDF/File',
+                              style: GoogleFonts.notoSansBengali(fontSize: 10, fontWeight: FontWeight.w700),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                              shape: const RoundedRectangleBorder(),
                             ),
                           ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (selectedFileName != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightGreen50,
+                          border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              selectedMimeType.startsWith('image/') ? Icons.image_outlined : Icons.description_outlined,
+                              color: AppColors.primaryGreen,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                selectedFileName!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            const Icon(Icons.check_circle, size: 18, color: AppColors.primaryGreen),
+                          ],
                         ),
                       ),
                     ],
-                  ),
 
-                  // File নির্বাচিত হলে নাম দেখাবে
-                  if (selectedFileName != null) ...[
                     const SizedBox(height: 12),
-
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppColors.lightGreen50,
-                        border: Border.all(
-                          color: AppColors.primaryGreen
-                              .withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            selectedMimeType.startsWith('image/')
-                                ? Icons.image_outlined
-                                : Icons.description_outlined,
-                            color: AppColors.primaryGreen,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              selectedFileName!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.plusJakartaSans(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          const Icon(
-                            Icons.check_circle,
-                            size: 18,
-                            color: AppColors.primaryGreen,
-                          ),
-                        ],
-                      ),
+                    Text(
+                      isBn
+                          ? 'নথিটি আপনার নিরাপদ ডিভাইসে এনক্রিপ্ট করে সংরক্ষণ করা হয়।'
+                          : 'Document is securely encrypted and stored on your device.',
+                      style: GoogleFonts.notoSansBengali(fontSize: 11, color: AppColors.textMuted),
                     ),
                   ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(
+                    isBn ? 'বাতিল' : 'Cancel',
+                    style: GoogleFonts.notoSansBengali(color: AppColors.textSecondary),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    if (selectedLocalFile == null || selectedFileName == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isBn
+                                ? 'অনুগ্রহ করে স্ক্যান করুন অথবা একটি ফাইল নির্বাচন করুন।'
+                                : 'Please scan or select a file first.',
+                          ),
+                        ),
+                      );
+                      return;
+                    }
 
-                  const SizedBox(height: 12),
+                    try {
+                      final bytes = await selectedLocalFile!.readAsBytes();
+                      final realFileData = base64Encode(bytes);
 
-                  // এই security লেখা অপরিবর্তিত থাকবে
-                  Text(
-                    isBn
-                        ? 'নথিটি আপনার নিরাপদ ডিভাইসে এনক্রিপ্ট করে সংরক্ষণ করা হয়।'
-                        : 'Document is securely encrypted and stored on your device.',
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 11,
-                      color: AppColors.textMuted,
-                    ),
+                      if (!context.mounted) return;
+
+                      final auth = Provider.of<AuthProvider>(context, listen: false);
+                      final dashboard = Provider.of<DashboardProvider>(context, listen: false);
+                      final typeObj = _docTypes.firstWhere((t) => t.type == selectedType);
+
+                      await dashboard.uploadDocument(
+                        userId: auth.user?.id ?? 1,
+                        docType: selectedType,
+                        fileName: selectedFileName!,
+                        fileSize: selectedFileSize,
+                        mimeType: selectedMimeType,
+                        fileData: realFileData,
+                        extractedMeta: {
+                          'doc_title': isBn ? typeObj.nameBn : typeObj.nameEn,
+                          'verified': true,
+                        },
+                      );
+
+                      if (ctx.mounted) Navigator.pop(ctx);
+                      if (mounted) {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isBn ? 'নথি সফলভাবে লকারে সংরক্ষণ করা হয়েছে।' : 'Document saved successfully.',
+                            ),
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: Text(isBn ? 'ফাইল সংরক্ষণ করা যায়নি।' : 'Could not save file.'),
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Text(
+                    isBn ? 'সংরক্ষণ করুন' : 'Save Document',
+                    style: GoogleFonts.notoSansBengali(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDocumentDetails(CitizenDocument doc, bool isBn) {
+    final meta = doc.extractedMeta;
+    final typeTitle = CitizenDocument.getDocTypeName(doc.docType, isBn);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.primaryGreen, width: 4)),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.verified, color: AppColors.primaryGreen, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        typeTitle,
+                        style: GoogleFonts.notoSansBengali(fontSize: 16, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
                   ),
                 ],
               ),
-            ),
+              const Divider(height: 16),
 
-            actions: [
-              // Cancel Button অপরিবর্তিত
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(
-                  isBn ? 'বাতিল' : 'Cancel',
-                  style: GoogleFonts.notoSansBengali(
-                    color: AppColors.textSecondary,
-                  ),
-                ),
+              Text(
+                '${isBn ? 'ফাইলের নাম:' : 'File:'} ${doc.fileName}',
+                style: GoogleFonts.plusJakartaSans(fontSize: 12, color: AppColors.textSecondary),
               ),
+              const SizedBox(height: 12),
 
-              // Save আসল File-এর data ব্যবহার করবে
-              ElevatedButton(
-                onPressed: () async {
-                  // File ছাড়া Save করা যাবে না
-                  if (selectedLocalFile == null ||
-                      selectedFileName == null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          isBn
-                              ? 'অনুগ্রহ করে স্ক্যান করুন অথবা একটি ফাইল নির্বাচন করুন।'
-                              : 'Please scan or select a file first.',
-                        ),
-                      ),
-                    );
-                    return;
-                  }
+              Text(
+                isBn ? 'উদ্ধারকৃত ওসিআর মেটাডাটা:' : 'Extracted OCR Metadata:',
+                style: GoogleFonts.notoSansBengali(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryGreen),
+              ),
+              const SizedBox(height: 6),
 
-                  try {
-                    // আসল file-এর bytes পড়া হচ্ছে
-                    final bytes =
-                        await selectedLocalFile!.readAsBytes();
-
-                    // আসল file data Base64-এ convert করা হচ্ছে
-                    final realFileData = base64Encode(bytes);
-
-                    if (!context.mounted) return;
-
-                    final auth = Provider.of<AuthProvider>(
-                      context,
-                      listen: false,
-                    );
-
-                    final dashboard =
-                        Provider.of<DashboardProvider>(
-                      context,
-                      listen: false,
-                    );
-
-                    final typeObj = _docTypes.firstWhere(
-                      (t) => t.type == selectedType,
-                    );
-
-                    // MOCK_BASE64_DATA আর নেই
-                    // আসল নির্বাচিত file-এর data পাঠানো হচ্ছে
-                    await dashboard.uploadDocument(
-                      userId: auth.user?.id ?? 1,
-                      docType: selectedType,
-                      fileName: selectedFileName!,
-                      fileSize: selectedFileSize,
-                      mimeType: selectedMimeType,
-                      fileData: realFileData,
-                      extractedMeta: {
-                        'title':
-                            isBn ? typeObj.nameBn : typeObj.nameEn,
-                        'verified': true,
-                      },
-                    );
-
-                    if (ctx.mounted) {
-                      Navigator.pop(ctx);
-                    }
-
-                    if (mounted) {
-                      ScaffoldMessenger.of(this.context)
-                          .showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isBn
-                                ? 'নথি সফলভাবে লকারে সংরক্ষণ করা হয়েছে।'
-                                : 'Document successfully saved to your locker.',
+              if (meta.isEmpty)
+                Text(
+                  isBn ? 'কোনো মেটাডাটা সংরক্ষিত নেই' : 'No metadata recorded',
+                  style: GoogleFonts.notoSansBengali(fontSize: 11, color: AppColors.textMuted),
+                )
+              else
+                ...meta.entries.map((entry) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2.5),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 130,
+                          child: Text(
+                            '${entry.key}:',
+                            style: GoogleFonts.plusJakartaSans(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                           ),
                         ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(this.context)
-                          .showSnackBar(
-                        SnackBar(
-                          content: Text(
-                            isBn
-                                ? 'ফাইল সংরক্ষণ করা যায়নি। আবার চেষ্টা করুন।'
-                                : 'Could not save the file. Please try again.',
+                        Expanded(
+                          child: Text(
+                            entry.value.toString(),
+                            style: GoogleFonts.notoSansBengali(fontSize: 11, fontWeight: FontWeight.w700),
                           ),
                         ),
-                      );
-                    }
-                  }
-                },
-                child: Text(
-                  isBn ? 'সংরক্ষণ করুন' : 'Save Document',
-                  style: GoogleFonts.notoSansBengali(
-                    fontWeight: FontWeight.w700,
+                      ],
+                    ),
+                  );
+                }),
+
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    Navigator.pop(ctx);
+                    final dashboard = Provider.of<DashboardProvider>(context, listen: false);
+                    await dashboard.deleteDocument(doc.id);
+                  },
+                  icon: const Icon(Icons.delete_outline, size: 16, color: AppColors.primaryRed),
+                  label: Text(
+                    isBn ? 'লকার থেকে মুছে ফেলুন' : 'Delete from Locker',
+                    style: GoogleFonts.notoSansBengali(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primaryRed),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primaryRed),
+                    shape: const RoundedRectangleBorder(),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
                   ),
                 ),
               ),
             ],
-          );
-        },
-      );
-    },
-  );
-}
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildAuthGate(BuildContext context, bool isBn, AuthProvider auth, DashboardProvider dashboard, LanguageProvider langProvider) {
     return Container(
@@ -514,17 +534,16 @@ void _showUploadDialog() {
           ),
           const SizedBox(height: 20),
 
-          // Login Button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
               },
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: const RoundedRectangleBorder(),
+              ),
               child: Text(
                 isBn ? 'লগইন করুন' : 'Log In to Account',
                 style: GoogleFonts.notoSansBengali(fontSize: 12, fontWeight: FontWeight.w700),
@@ -533,17 +552,16 @@ void _showUploadDialog() {
           ),
           const SizedBox(height: 8),
 
-          // Register Button
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
               onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const RegisterScreen()),
-                );
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen()));
               },
-              style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: const RoundedRectangleBorder(),
+              ),
               child: Text(
                 isBn ? 'নতুন অ্যাকাউন্ট নিবন্ধন করুন' : 'Create Free Account',
                 style: GoogleFonts.notoSansBengali(fontSize: 12, fontWeight: FontWeight.w700),
@@ -554,7 +572,6 @@ void _showUploadDialog() {
           const Divider(color: AppColors.border),
           const SizedBox(height: 14),
 
-          // 1-Click Demo Login
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -572,7 +589,8 @@ void _showUploadDialog() {
                 ),
               ),
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: AppColors.primaryGreen, style: BorderStyle.solid),
+                side: const BorderSide(color: AppColors.primaryGreen),
+                shape: const RoundedRectangleBorder(),
                 padding: const EdgeInsets.symmetric(vertical: 10),
               ),
             ),
@@ -589,7 +607,6 @@ void _showUploadDialog() {
     final dashboard = context.watch<DashboardProvider>();
     final isBn = langProvider.isBn;
 
-    // Show Auth Gate if not logged in
     if (!auth.isLoggedIn) {
       return Container(
         color: AppColors.bgPage,
@@ -601,8 +618,24 @@ void _showUploadDialog() {
       );
     }
 
-    final documents = dashboard.documents;
+    final allDocs = dashboard.documents;
     final percent = dashboard.completenessPercent;
+
+    // Filter by Folder Category
+    final currentFolderObj = _folders.firstWhere((f) => f.id == _activeFolder, orElse: () => _folders.first);
+    final folderDocs = allDocs.where((d) {
+      if (_activeFolder == 'all') return true;
+      return currentFolderObj.docTypes.contains(d.docType);
+    }).toList();
+
+    // Filter by Search Query
+    final filteredDocs = folderDocs.where((d) {
+      if (_searchQuery.trim().isEmpty) return true;
+      final q = _searchQuery.toLowerCase().trim();
+      final title = CitizenDocument.getDocTypeName(d.docType, isBn).toLowerCase();
+      final fileName = d.fileName.toLowerCase();
+      return title.contains(q) || fileName.contains(q);
+    }).toList();
 
     return RefreshIndicator(
       onRefresh: () => dashboard.loadDashboardData(auth.user?.id, isDemo: auth.user?.id == 1),
@@ -613,7 +646,6 @@ void _showUploadDialog() {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Loading Bar
             if (dashboard.isLoading)
               const Padding(
                 padding: EdgeInsets.only(bottom: 12),
@@ -624,7 +656,7 @@ void _showUploadDialog() {
                 ),
               ),
 
-            // Banner Card
+            // Banner Card (Windows 10 Flat)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: const BoxDecoration(
@@ -641,7 +673,6 @@ void _showUploadDialog() {
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       Expanded(
                         child: Text(
@@ -659,10 +690,13 @@ void _showUploadDialog() {
                         icon: const Icon(Icons.add, size: 14),
                         label: Text(
                           isBn ? 'আপলোড' : 'Upload',
-                          style: GoogleFonts.notoSansBengali(fontSize: 12),
+                          style: GoogleFonts.notoSansBengali(fontSize: 12, fontWeight: FontWeight.w700),
                         ),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          backgroundColor: AppColors.primaryGreen,
+                          foregroundColor: Colors.white,
+                          shape: const RoundedRectangleBorder(),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                       ),
                     ],
@@ -678,7 +712,6 @@ void _showUploadDialog() {
                   ),
                   const SizedBox(height: 12),
 
-                  // Vault Completeness Progress Bar
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -701,23 +734,83 @@ void _showUploadDialog() {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.zero,
-                    child: LinearProgressIndicator(
-                      value: percent / 100,
-                      minHeight: 6,
-                      backgroundColor: AppColors.bgMuted,
-                      valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
-                    ),
+                  LinearProgressIndicator(
+                    value: percent / 100,
+                    minHeight: 6,
+                    backgroundColor: AppColors.bgMuted,
+                    valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 14),
 
+            // Search Filter Box
+            TextField(
+              controller: _searchController,
+              onChanged: (val) => setState(() => _searchQuery = val),
+              decoration: InputDecoration(
+                hintText: isBn ? 'লকার নথিপত্র অনুসন্ধান করুন...' : 'Search locker documents...',
+                hintStyle: GoogleFonts.notoSansBengali(fontSize: 12, color: AppColors.textMuted),
+                prefixIcon: const Icon(Icons.search, size: 18, color: AppColors.textMuted),
+                isDense: true,
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                border: const OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: const OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: const OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: AppColors.primaryGreen),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Folder Tabs
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: _folders.map((f) {
+                  final isSelected = _activeFolder == f.id;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: InkWell(
+                      onTap: () => setState(() => _activeFolder = f.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isSelected ? AppColors.primaryGreen : Colors.white,
+                          border: Border.all(
+                            color: isSelected ? AppColors.primaryGreen : AppColors.border,
+                          ),
+                        ),
+                        child: Text(
+                          isBn ? f.nameBn : f.nameEn,
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 11,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 14),
+
             // Uploaded Documents List
-            if (documents.isEmpty)
+            if (filteredDocs.isEmpty) ...[
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.all(24),
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
@@ -729,7 +822,7 @@ void _showUploadDialog() {
                     const Icon(Icons.folder_open_outlined, size: 36, color: AppColors.textMuted),
                     const SizedBox(height: 8),
                     Text(
-                      isBn ? 'লকারে এখনও কোনো নথি সংরক্ষিত নেই' : 'No documents in locker yet',
+                      isBn ? 'এই ফোল্ডারে কোনো নথি সংরক্ষিত নেই' : 'No documents in this folder',
                       style: GoogleFonts.notoSansBengali(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
@@ -744,88 +837,92 @@ void _showUploadDialog() {
                         langProvider.t('locker.uploadBtn'),
                         style: GoogleFonts.notoSansBengali(fontSize: 12),
                       ),
+                      style: OutlinedButton.styleFrom(shape: const RoundedRectangleBorder()),
                     ),
                   ],
                 ),
-              )
-            else
+              ),
+            ] else ...[
               ListView.separated(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: documents.length,
+                itemCount: filteredDocs.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 8),
                 itemBuilder: (context, index) {
-                  final doc = documents[index];
+                  final doc = filteredDocs[index];
                   final typeTitle = CitizenDocument.getDocTypeName(doc.docType, isBn);
 
-                  return Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.bgSurface,
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          color: AppColors.lightGreen50,
-                          child: const Icon(Icons.file_present_outlined,
-                              size: 20, color: AppColors.primaryGreen),
+                  return InkWell(
+                    onTap: () => _showDocumentDetails(doc, isBn),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        color: AppColors.bgSurface,
+                        border: Border(
+                          left: BorderSide(color: AppColors.primaryGreen, width: 3),
+                          top: BorderSide(color: AppColors.border),
+                          right: BorderSide(color: AppColors.border),
+                          bottom: BorderSide(color: AppColors.border),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Text(
-                                    typeTitle,
-                                    style: GoogleFonts.notoSansBengali(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                                    color: AppColors.lightGreen50,
-                                    child: Text(
-                                      isBn ? 'যাচাইকৃত' : 'Verified',
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            color: AppColors.lightGreen50,
+                            child: const Icon(Icons.file_present_outlined, size: 20, color: AppColors.primaryGreen),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      typeTitle,
                                       style: GoogleFonts.notoSansBengali(
-                                        fontSize: 9,
+                                        fontSize: 13,
                                         fontWeight: FontWeight.w700,
-                                        color: AppColors.primaryGreen,
+                                        color: AppColors.textPrimary,
                                       ),
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                doc.fileName,
-                                style: GoogleFonts.plusJakartaSans(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      color: AppColors.lightGreen50,
+                                      child: Text(
+                                        isBn ? 'যাচাইকৃত' : 'Verified',
+                                        style: GoogleFonts.notoSansBengali(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.primaryGreen,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
+                                const SizedBox(height: 2),
+                                Text(
+                                  doc.fileName,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline, size: 18, color: AppColors.primaryRed),
-                          onPressed: () async {
-                            await dashboard.deleteDocument(doc.id);
-                          },
-                        ),
-                      ],
+                          const Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
+                        ],
+                      ),
                     ),
                   );
                 },
               ),
+            ],
             const SizedBox(height: 30),
           ],
         ),
