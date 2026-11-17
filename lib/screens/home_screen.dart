@@ -10,7 +10,6 @@ import '../widgets/home/weather_advisory.dart';
 import '../widgets/home/category_grid.dart';
 import '../widgets/home/featured_services.dart';
 import '../widgets/home/how_it_works.dart';
-import '../widgets/common/footer_widget.dart';
 import 'service_detail_screen.dart';
 import 'opportunities_screen.dart';
 
@@ -175,12 +174,6 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // 8. Full 3-Column Footer matching web Footer.tsx
-          FooterWidget(onNavigateTab: onNavigateTab),
-
-          const SizedBox(height: 70), // Bottom nav bar breathing space
         ],
       ),
     );

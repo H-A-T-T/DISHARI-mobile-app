@@ -12,7 +12,6 @@ import '../widgets/dashboard/profile_tab.dart';
 import 'login_screen.dart';
 import 'opportunities_screen.dart';
 import 'register_screen.dart';
-import 'services_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int targetTab)? onNavigateTab;
@@ -282,7 +281,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        isBn ? 'আমার ড্যাশবোর্ড ও ক্লাউড লকার' : 'Citizen Dashboard & Cloud Vault',
+                        isBn ? 'আমার ড্যাশবোর্ড' : 'Citizen Dashboard',
                         style: GoogleFonts.notoSansBengali(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
@@ -394,7 +393,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               children: [
                 _buildOverviewTab(context, isBn),
                 const DocumentLockerTab(),
-                const ApplicationsTab(),
+                ApplicationsTab(onNavigateTab: widget.onNavigateTab),
                 const DeadlinesTab(),
                 const OpportunitiesScreen(isEmbedded: true),
                 const ProfileTab(),
@@ -760,60 +759,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Browse Services CTA Card (1:1 with Web)
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: AppColors.bgSurface,
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isBn ? 'কোন সরকারি সেবাটি আপনার প্রয়োজন?' : 'Which government service do you need?',
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isBn
-                        ? 'পাসপোর্ট, এনআইডি সংশোধন, ভূমি নামজারি ও ভাতাসহ সকল সেবার সঠিক নিয়ম ও ফি জেনে নিন।'
-                        : 'Explore gazette requirements, official fees, and step-by-step procedures.',
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 11,
-                      color: AppColors.textSecondary,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ServicesScreen()),
-                      );
-                    },
-                    icon: const Icon(Icons.arrow_forward, size: 14),
-                    label: Text(
-                      isBn ? 'সকল সেবা ডিরেক্টরি' : 'All Services Directory',
-                      style: GoogleFonts.notoSansBengali(fontSize: 11, fontWeight: FontWeight.w700),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGreen,
-                      foregroundColor: Colors.white,
-                      shape: const RoundedRectangleBorder(),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     ),
                   ),
                 ],

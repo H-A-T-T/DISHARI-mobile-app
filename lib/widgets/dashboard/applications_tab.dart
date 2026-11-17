@@ -7,9 +7,25 @@ import '../../models/application.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/language_provider.dart';
 import '../../screens/services_screen.dart';
+import '../common/jonobondhu_chat_overlay.dart';
 
 class ApplicationsTab extends StatelessWidget {
-  const ApplicationsTab({super.key});
+  final Function(int targetTab)? onNavigateTab;
+
+  const ApplicationsTab({super.key, this.onNavigateTab});
+
+  void _goToServices(BuildContext context) {
+    if (onNavigateTab != null) {
+      onNavigateTab!(1);
+    } else if (JonobondhuChatOverlay.globalNavigateTab != null) {
+      JonobondhuChatOverlay.globalNavigateTab!(1);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const ServicesScreen()),
+      );
+    }
+  }
 
   Future<void> _openPortal(String? url) async {
     if (url != null && url.isNotEmpty && url != '#') {
@@ -376,12 +392,7 @@ class ApplicationsTab extends StatelessWidget {
                 ),
                 const SizedBox(height: 14),
                 ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ServicesScreen()),
-                    );
-                  },
+                  onPressed: () => _goToServices(context),
                   icon: const Icon(Icons.add, size: 14),
                   label: Text(
                     isBn ? 'নতুন সেবা বেছে নিন' : 'Apply For Service',
@@ -439,12 +450,7 @@ class ApplicationsTab extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => const ServicesScreen()),
-                      );
-                    },
+                    onPressed: () => _goToServices(context),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryGreen,
                       foregroundColor: Colors.white,
