@@ -6,9 +6,13 @@ import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/dashboard/applications_tab.dart';
+import '../widgets/dashboard/deadlines_tab.dart';
+import '../widgets/dashboard/document_locker_tab.dart';
 import '../widgets/dashboard/profile_tab.dart';
 import 'login_screen.dart';
+import 'opportunities_screen.dart';
 import 'register_screen.dart';
+import 'services_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int targetTab)? onNavigateTab;
@@ -23,7 +27,8 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  int _subTab = 0; // 0: Overview, 1: Applications, 2: Profile
+  // 0: Overview, 1: Locker, 2: Applications, 3: Deadlines, 4: Opportunities, 5: Profile
+  int _activeSubTab = 0;
 
   @override
   void initState() {
@@ -35,6 +40,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         dashboard.loadDashboardData(auth.user?.id, isDemo: auth.user?.id == 1);
       }
     });
+  }
+
+  String _calculateStorageText(int totalBytes) {
+    if (totalBytes == 0) return '0.00 MB / 100 MB';
+    final mb = totalBytes / (1024 * 1024);
+    if (mb < 0.05) {
+      final kb = (totalBytes / 1024).toStringAsFixed(1);
+      return '$kb KB / 100 MB';
+    }
+    return '${mb.toStringAsFixed(2)} MB / 100 MB';
   }
 
   @override
@@ -116,6 +131,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: const RoundedRectangleBorder(),
                     ),
                     child: Text(
                       isBn ? 'লগইন করুন' : 'Log In to Account',
@@ -137,6 +153,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: const RoundedRectangleBorder(),
                     ),
                     child: Text(
                       isBn ? 'নতুন অ্যাকাউন্ট নিবন্ধন করুন' : 'Create Free Account',
@@ -148,7 +165,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const Divider(color: AppColors.border),
                 const SizedBox(height: 14),
 
-                // 1-Click Demo Login Button
+                // 1-Click Demo Login
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
@@ -158,7 +175,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                     icon: const Icon(Icons.person_pin_outlined, size: 16, color: AppColors.primaryGreen),
                     label: Text(
-                      langProvider.t('dashboard.demoLogin'),
+                      isBn ? 'ডেমো নাগরিক হিসেবে প্রবেশ করুন (১-ক্লিক)' : 'Enter as Demo Citizen (1-Click)',
                       style: GoogleFonts.notoSansBengali(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
@@ -166,7 +183,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppColors.primaryGreen, style: BorderStyle.solid),
+                      side: const BorderSide(color: AppColors.primaryGreen),
+                      shape: const RoundedRectangleBorder(),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                     ),
                   ),
@@ -178,61 +196,128 @@ class _DashboardScreenState extends State<DashboardScreen> {
       );
     }
 
-    // ─── AUTHENTICATED DASHBOARD ───────────────────────────────────────────
-    final subTabTitles = [
-      langProvider.t('dashboard.tabOverview'),
-      langProvider.t('dashboard.tabApps'),
-      langProvider.t('dashboard.tabProfile'),
+    // ─── AUTHENTICATED DASHBOARD (1:1 WITH WEBSITE DASHBOARD) ───────────────
+    final docs = dashboard.documents;
+    final apps = dashboard.applications;
+    final deadlines = dashboard.deadlines;
+    final urgentCount = deadlines.where((d) => d.urgency == 'high').length;
+
+    final subTabs = [
+      (
+        id: 'home',
+        labelBn: 'সারসংক্ষেপ (হোম)',
+        labelEn: 'Overview (Home)',
+        icon: Icons.home_outlined,
+        badge: null as String?,
+      ),
+      (
+        id: 'locker',
+        labelBn: 'আমার নথিপত্র (লকার)',
+        labelEn: 'My Documents',
+        icon: Icons.folder_shared_outlined,
+        badge: docs.isNotEmpty ? '${docs.length}' : null,
+      ),
+      (
+        id: 'applications',
+        labelBn: 'আমার আবেদনসমূহ',
+        labelEn: 'My Applications',
+        icon: Icons.assignment_outlined,
+        badge: apps.isNotEmpty ? '${apps.length}' : null,
+      ),
+      (
+        id: 'deadlines',
+        labelBn: 'নোটিফিকেশন ও ডেডলাইন',
+        labelEn: 'Alerts & Deadlines',
+        icon: Icons.notifications_none_outlined,
+        badge: urgentCount > 0 ? '!' : null,
+      ),
+      (
+        id: 'opportunities',
+        labelBn: 'সরকারি সুযোগ ও সহায়তা',
+        labelEn: 'Opportunities',
+        icon: Icons.auto_awesome,
+        badge: 'New',
+      ),
+      (
+        id: 'settings',
+        labelBn: 'সেটিংস ও প্রোফাইল',
+        labelEn: 'Settings & Profile',
+        icon: Icons.settings_outlined,
+        badge: null,
+      ),
     ];
 
     return Container(
       color: AppColors.bgPage,
       child: Column(
         children: [
-          // User Header Bar
+          // Top Docket Header (1:1 with Web Header)
           Container(
             color: AppColors.bgSurface,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: AppColors.primaryGreen, width: 3),
+                bottom: BorderSide(color: AppColors.border, width: 1),
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      auth.user?.fullName ?? (isBn ? 'নাগরিক' : 'Citizen'),
-                      style: GoogleFonts.notoSansBengali(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isBn
+                            ? 'গণপ্রজাতন্ত্রী বাংলাদেশ — নাগরিক ডিজিটাল ওয়ার্কস্পেস'
+                            : "PEOPLE'S REPUBLIC OF BANGLADESH — CITIZEN WORKSPACE",
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryGreen,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${langProvider.t("dashboard.citizenId")}: ${auth.citizenId}',
-                      style: GoogleFonts.plusJakartaSans(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
+                      const SizedBox(height: 2),
+                      Text(
+                        isBn ? 'আমার ড্যাশবোর্ড ও ক্লাউড লকার' : 'Citizen Dashboard & Cloud Vault',
+                        style: GoogleFonts.notoSansBengali(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  color: AppColors.lightGreen50,
-                  child: Text(
-                    isBn ? 'সক্রিয় নাগরিক' : 'Verified Citizen',
-                    style: GoogleFonts.notoSansBengali(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primaryGreen,
-                    ),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgMuted,
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.shield_outlined, size: 12, color: AppColors.primaryGreen),
+                      const SizedBox(width: 4),
+                      Text(
+                        auth.citizenId,
+                        style: GoogleFonts.plusJakartaSans(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryGreen,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
 
-          // Horizontal Subtab Chips
+          // Horizontal 6-Tab Navigation Rail
           Container(
             decoration: const BoxDecoration(
               color: AppColors.bgSurface,
@@ -240,29 +325,59 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: Row(
-                children: List.generate(subTabTitles.length, (idx) {
-                  final isSel = _subTab == idx;
+                children: List.generate(subTabs.length, (idx) {
+                  final tab = subTabs[idx];
+                  final isSel = _activeSubTab == idx;
+
                   return Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: InkWell(
-                      onTap: () => setState(() => _subTab = idx),
+                      onTap: () => setState(() => _activeSubTab = idx),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isSel ? AppColors.primaryGreen : AppColors.bgMuted,
+                          color: isSel ? AppColors.primaryGreen : Colors.white,
                           border: Border.all(
                             color: isSel ? AppColors.primaryGreen : AppColors.border,
                           ),
                         ),
-                        child: Text(
-                          subTabTitles[idx],
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 11,
-                            fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
-                            color: isSel ? Colors.white : AppColors.textPrimary,
-                          ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              tab.icon,
+                              size: 14,
+                              color: isSel ? Colors.white : AppColors.textSecondary,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              isBn ? tab.labelBn : tab.labelEn,
+                              style: GoogleFonts.notoSansBengali(
+                                fontSize: 11,
+                                fontWeight: isSel ? FontWeight.w700 : FontWeight.w500,
+                                color: isSel ? Colors.white : AppColors.textPrimary,
+                              ),
+                            ),
+                            if (tab.badge != null) ...[
+                              const SizedBox(width: 5),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: isSel ? Colors.white : const Color(0xFFE5E7EB),
+                                ),
+                                child: Text(
+                                  tab.badge!,
+                                  style: GoogleFonts.plusJakartaSans(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w800,
+                                    color: isSel ? AppColors.primaryGreen : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                     ),
@@ -275,10 +390,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
           // Subtab Content
           Expanded(
             child: IndexedStack(
-              index: _subTab,
+              index: _activeSubTab,
               children: [
                 _buildOverviewTab(context, isBn),
+                const DocumentLockerTab(),
                 const ApplicationsTab(),
+                const DeadlinesTab(),
+                const OpportunitiesScreen(isEmbedded: true),
                 const ProfileTab(),
               ],
             ),
@@ -292,6 +410,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final dashboard = context.watch<DashboardProvider>();
     final auth = context.watch<AuthProvider>();
 
+    final user = auth.user;
+    final docs = dashboard.documents;
+    final apps = dashboard.applications;
+
+    final totalSizeBytes = docs.fold<int>(0, (acc, d) => acc + (d.fileSize > 0 ? d.fileSize : 0));
+    final storageText = _calculateStorageText(totalSizeBytes);
+    final storagePercent = (totalSizeBytes / (100 * 1024 * 1024)).clamp(0.02, 1.0);
+
     return RefreshIndicator(
       onRefresh: () => dashboard.loadDashboardData(auth.user?.id, isDemo: auth.user?.id == 1),
       color: AppColors.primaryGreen,
@@ -301,49 +427,214 @@ class _DashboardScreenState extends State<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Stats Tiles
+            // Civic Greeting Banner — Windows 10 Flat Card (1:1 with Web)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: AppColors.bgSurface,
+                border: Border(
+                  left: BorderSide(color: AppColors.primaryGreen, width: 4),
+                  top: BorderSide(color: AppColors.border, width: 1),
+                  right: BorderSide(color: AppColors.border, width: 1),
+                  bottom: BorderSide(color: AppColors.border, width: 1),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isBn ? 'ডিজিটাল নাগরিক ওয়ার্কস্পেস' : 'DIGITAL CITIZEN WORKSPACE',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryGreen,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isBn ? 'সুপ্রভাত, ${user?.fullName ?? "নাগরিক"}' : 'Welcome, ${user?.fullName ?? "Citizen"}',
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isBn
+                        ? 'আপনার সকল সরকারি নথিপত্র, চলমান আবেদন ও সেবা সংক্রান্ত তথ্য এখানে সংরক্ষিত আছে।'
+                        : 'All your government credentials, active application dockets, and civic deadlines stored here.',
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // 2 Big Action Cards (Locker + Applications) 1:1 with Web
             Row(
               children: [
+                // Card 1: Document Locker Quick Card
                 Expanded(
-                  child: _buildMetricTile(
-                    title: isBn ? 'লকার নথিপত্র' : 'Locker Docs',
-                    value: isBn
-                        ? AppConstants.toBengaliNumber(dashboard.documents.length)
-                        : '${dashboard.documents.length}',
-                    icon: Icons.folder_special_outlined,
-                    color: AppColors.primaryGreen,
-                    onTap: () => widget.onNavigateTab?.call(2), // Jump to Locker bottom nav tab
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgSurface,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              color: AppColors.lightGreen50,
+                              child: const Icon(Icons.folder_shared_outlined, size: 18, color: AppColors.primaryGreen),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              color: AppColors.lightGreen50,
+                              child: Text(
+                                '${docs.length} ${isBn ? "টি ফাইল" : "files"}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryGreen,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          isBn ? 'আমার নথিপত্র' : 'My Documents',
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isBn
+                              ? 'পাসপোর্ট, এনআইডি ও জন্ম সনদ ডিজিটাল লকারে সংরক্ষণ করুন।'
+                              : 'Store NID, birth cert, and credentials securely.',
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => setState(() => _activeSubTab = 1), // switch to Locker tab
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primaryGreen,
+                              foregroundColor: Colors.white,
+                              shape: const RoundedRectangleBorder(),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            child: Text(
+                              isBn ? 'লকার খুলুন' : 'Open Locker',
+                              style: GoogleFonts.notoSansBengali(fontSize: 11, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
+
+                // Card 2: Applications Quick Card
                 Expanded(
-                  child: _buildMetricTile(
-                    title: isBn ? 'আবেদন ডকেট' : 'Application Dockets',
-                    value: isBn
-                        ? AppConstants.toBengaliNumber(dashboard.applications.length)
-                        : '${dashboard.applications.length}',
-                    icon: Icons.assignment_outlined,
-                    color: AppColors.catIdentity,
-                    onTap: () => setState(() => _subTab = 1), // Switch to Applications subtab
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _buildMetricTile(
-                    title: isBn ? 'আসন্ন ডেডলাইন' : 'Deadlines',
-                    value: isBn
-                        ? AppConstants.toBengaliNumber(dashboard.deadlines.length)
-                        : '${dashboard.deadlines.length}',
-                    icon: Icons.notifications_active_outlined,
-                    color: AppColors.catTax,
-                    onTap: () => widget.onNavigateTab?.call(3), // Jump to Deadlines bottom nav tab
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppColors.bgSurface,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              color: const Color(0xFFF3E8FF), // purple-50
+                              child: const Icon(Icons.assignment_outlined, size: 18, color: Color(0xFF7E22CE)),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              color: AppColors.bgMuted,
+                              child: Text(
+                                '${apps.length} ${isBn ? "টি আবেদন" : "dockets"}',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          isBn ? 'চলমান আবেদনসমূহ' : 'Active Applications',
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          isBn
+                              ? 'প্রস্তুতকৃত সকল কার্যপত্র ও ট্র্যাকিং তথ্য এখানে প্রদর্শিত হয়।'
+                              : 'Track your government application dockets.',
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 10,
+                            color: AppColors.textSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => setState(() => _activeSubTab = 2), // switch to Applications tab
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.black87,
+                              foregroundColor: Colors.white,
+                              shape: const RoundedRectangleBorder(),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            child: Text(
+                              isBn ? 'আবেদন দেখুন' : 'View Dockets',
+                              style: GoogleFonts.notoSansBengali(fontSize: 11, fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
 
-            // Quick Locker Status Card
+            // Google Drive Style Storage Meter
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -356,42 +647,119 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        isBn ? 'ডিজিটাল লকার প্রস্তুতি' : 'Locker Completeness',
-                        style: GoogleFonts.notoSansBengali(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        ),
+                      Row(
+                        children: [
+                          const Icon(Icons.cloud_done_outlined, size: 16, color: AppColors.primaryGreen),
+                          const SizedBox(width: 6),
+                          Text(
+                            isBn ? 'ব্যবহৃত ক্লাউড স্পেস:' : 'Cloud Storage Quota:',
+                            style: GoogleFonts.notoSansBengali(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                       Text(
-                        isBn
-                            ? '${AppConstants.toBengaliNumber(dashboard.completenessPercent)}%'
-                            : '${dashboard.completenessPercent}%',
+                        storageText,
                         style: GoogleFonts.plusJakartaSans(
-                          fontSize: 13,
+                          fontSize: 11,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.primaryGreen,
+                          color: AppColors.textPrimary,
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   LinearProgressIndicator(
-                    value: dashboard.completenessPercent / 100,
+                    value: storagePercent,
                     backgroundColor: AppColors.bgMuted,
                     valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primaryGreen),
-                    minHeight: 6,
+                    minHeight: 5,
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.lock_outline, size: 11, color: AppColors.primaryGreen),
+                          const SizedBox(width: 3),
+                          Text(
+                            '256-Bit AES Encryption',
+                            style: GoogleFonts.plusJakartaSans(fontSize: 10, color: AppColors.primaryGreen, fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '100 MB Free Tier',
+                        style: GoogleFonts.plusJakartaSans(fontSize: 10, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Deadlines Alert Strip (1:1 with Web)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB), // amber-50
+                border: Border(
+                  left: const BorderSide(color: Color(0xFFF59E0B), width: 4), // amber-500
+                  top: BorderSide(color: Colors.amber.shade300),
+                  right: BorderSide(color: Colors.amber.shade300),
+                  bottom: BorderSide(color: Colors.amber.shade300),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.notifications_active, color: Color(0xFFB45309), size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          isBn ? 'আসন্ন আয়কর ও সরকারি সময়সীমা' : 'Upcoming Tax & Government Deadlines',
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
                   Text(
                     isBn
-                        ? 'NID ও জন্ম সনদ যুক্ত থাকলে যেকোনো সরকারি সেবা ফরম ১-ক্লিকে স্বয়ংক্রিয়ভাবে পূরণ করা যায়।'
-                        : 'Save NID and birth certificates once to auto-fill government forms with 1-click.',
+                        ? 'ব্যক্তিশ্রেণীর আয়কর রিটার্ন জমা দেওয়ার জাতীয় সময়সীমা: ৩০ নভেম্বর ২০২৬।'
+                        : 'Annual Individual Income Tax filing deadline: November 30, 2026.',
                     style: GoogleFonts.notoSansBengali(
                       fontSize: 11,
                       color: AppColors.textSecondary,
-                      height: 1.4,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton(
+                    onPressed: () => setState(() => _activeSubTab = 3), // switch to Deadlines tab
+                    style: OutlinedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    child: Text(
+                      isBn ? 'সব সময়সীমা দেখুন' : 'View All Deadlines',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
                   ),
                 ],
@@ -399,103 +767,89 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Quick Action Card
+            // Browse Services CTA Card (1:1 with Web)
             Container(
               padding: const EdgeInsets.all(14),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 color: AppColors.bgSurface,
-                border: Border(
-                  left: BorderSide(color: AppColors.primaryGreen, width: 3),
-                  top: BorderSide(color: AppColors.border, width: 1),
-                  right: BorderSide(color: AppColors.border, width: 1),
-                  bottom: BorderSide(color: AppColors.border, width: 1),
-                ),
+                border: Border.all(color: AppColors.border),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.shield_outlined, size: 24, color: AppColors.primaryGreen),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isBn ? 'নিরাপদ সরকারি সেবা সহকারী' : 'Verified Civic Companion',
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        Text(
-                          isBn
-                              ? 'দিশারী কোনো ব্যক্তিগত তথ্য অননুমোদিতভাবে সংরক্ষণ করে না।'
-                              : 'Dishari never stores or shares personal data without authorization.',
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    isBn ? 'কোন সরকারি সেবাটি আপনার প্রয়োজন?' : 'Which government service do you need?',
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isBn
+                        ? 'পাসপোর্ট, এনআইডি সংশোধন, ভূমি নামজারি ও ভাতাসহ সকল সেবার সঠিক নিয়ম ও ফি জেনে নিন।'
+                        : 'Explore gazette requirements, official fees, and step-by-step procedures.',
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 11,
+                      color: AppColors.textSecondary,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const ServicesScreen()),
+                      );
+                    },
+                    icon: const Icon(Icons.arrow_forward, size: 14),
+                    label: Text(
+                      isBn ? 'সকল সেবা ডিরেক্টরি' : 'All Services Directory',
+                      style: GoogleFonts.notoSansBengali(fontSize: 11, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                      foregroundColor: Colors.white,
+                      shape: const RoundedRectangleBorder(),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
+            const SizedBox(height: 16),
 
-  Widget _buildMetricTile({
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.bgSurface,
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Icon(icon, size: 18, color: color),
-                const Icon(Icons.arrow_forward, size: 12, color: AppColors.textMuted),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              value,
-              style: GoogleFonts.plusJakartaSans(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-                height: 1.1,
+            // Emergency Helpline Widget (1:1 with Web)
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.bgSurface,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isBn ? 'জরুরি নাগরিক হেল্পলাইন:' : 'Helplines:',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.primaryGreen,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text('৩৩৩ — সরকারি সেবা ও তথ্য', style: GoogleFonts.notoSansBengali(fontSize: 11, color: AppColors.textSecondary)),
+                  const SizedBox(height: 3),
+                  Text('৯৯৯ — জাতীয় জরুরি পুলিশ/অ্যাম্বুলেন্স', style: GoogleFonts.notoSansBengali(fontSize: 11, color: AppColors.textSecondary)),
+                  const SizedBox(height: 3),
+                  Text('১০৬ — দুর্নীতি দমন কমিশন (দুদক)', style: GoogleFonts.notoSansBengali(fontSize: 11, color: AppColors.textSecondary)),
+                ],
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: GoogleFonts.notoSansBengali(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-                height: 1.2,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
+            const SizedBox(height: 30),
           ],
         ),
       ),

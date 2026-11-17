@@ -8,7 +8,12 @@ import '../providers/language_provider.dart';
 import 'service_detail_screen.dart';
 
 class OpportunitiesScreen extends StatefulWidget {
-  const OpportunitiesScreen({super.key});
+  final bool isEmbedded;
+
+  const OpportunitiesScreen({
+    super.key,
+    this.isEmbedded = false,
+  });
 
   @override
   State<OpportunitiesScreen> createState() => _OpportunitiesScreenState();
@@ -84,22 +89,7 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
       return true;
     }).toList();
 
-    return Scaffold(
-      backgroundColor: AppColors.bgPage,
-      appBar: AppBar(
-        title: Text(
-          isBn ? 'সরকারি সুযোগ ও সহায়তা হাব' : 'Citizen Opportunity Hub',
-          style: GoogleFonts.notoSansBengali(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(color: AppColors.border, height: 1),
-        ),
-      ),
-      body: SingleChildScrollView(
+    final content = SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -623,7 +613,31 @@ class _OpportunitiesScreenState extends State<OpportunitiesScreen> {
             const SizedBox(height: 30),
           ],
         ),
+      );
+
+    if (widget.isEmbedded) {
+      return Container(
+        color: AppColors.bgPage,
+        child: content,
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: AppColors.bgPage,
+      appBar: AppBar(
+        title: Text(
+          isBn ? 'সরকারি সুযোগ ও সহায়তা হাব' : 'Citizen Opportunity Hub',
+          style: GoogleFonts.notoSansBengali(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Container(color: AppColors.border, height: 1),
+        ),
       ),
+      body: content,
     );
   }
 }
