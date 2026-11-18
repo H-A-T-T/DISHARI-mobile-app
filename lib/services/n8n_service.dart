@@ -5,8 +5,51 @@ import 'package:http/http.dart' as http;
 import '../config/env.dart';
 
 class N8nService {
+  /// Maps raw extracted keys from diverse n8n/AI models into consistent citizen document fields
+  static Map<String, dynamic> normalizeDocumentData(Map<String, dynamic> raw) {
+    final normalized = Map<String, dynamic>.from(raw);
+
+    void mapKey(List<String> sources, String target) {
+      if (normalized.containsKey(target) &&
+          normalized[target] != null &&
+          normalized[target].toString().trim().isNotEmpty) {
+        return;
+      }
+      for (final src in sources) {
+        if (raw.containsKey(src) &&
+            raw[src] != null &&
+            raw[src].toString().trim().isNotEmpty) {
+          normalized[target] = raw[src].toString().trim();
+          break;
+        }
+      }
+    }
+
+    mapKey(['Name', 'name', 'full_name', 'fullName', 'Citizen Name', 'Student Name', 'Candidate Name'], 'full_name_en');
+    mapKey(['বাংলা নাম', 'নাম', 'পূর্ণ নাম', 'fullNameBn', 'bangla_name'], 'full_name_bn');
+    mapKey(['NID', 'NID Number', 'id_number', 'idNumber', 'ID No', 'nid_no', 'Registration Number', 'Certificate No'], 'id_number');
+    mapKey(['Roll', 'roll', 'Roll No', 'roll_no', 'Student Roll'], 'roll');
+    mapKey(['Reg No', 'reg_no', 'Registration No', 'regNo'], 'reg_no');
+    mapKey(['Board', 'board', 'Education Board'], 'board');
+    mapKey(['DOB', 'dob', 'Date of Birth', 'date_of_birth', 'জন্ম তারিখ'], 'dob');
+    mapKey(['Father Name', 'father_name', 'Father', 'পিতা'], 'father_name');
+    mapKey(['Mother Name', 'mother_name', 'Mother', 'মাতা'], 'mother_name');
+    mapKey(['Blood Group', 'blood_group', 'Blood', 'রক্তের গ্রুপ'], 'blood_group');
+    mapKey(['Address', 'address', 'Full Address', 'ঠিকানা'], 'address');
+    mapKey(['Business Name', 'business_name', 'Trade Name', 'প্রতিষ্ঠানের নাম'], 'business_name');
+    mapKey(['Issue Date', 'issue_date', 'ইস্যু তারিখ'], 'issue_date');
+
+    // Auto assign full_name_bn if English is blank and Bengali exists, or vice versa
+    if ((normalized['full_name_bn'] == null || normalized['full_name_bn'].toString().isEmpty) &&
+        normalized['full_name_en'] != null) {
+      normalized['full_name_bn'] = normalized['full_name_en'];
+    }
+
+    return normalized;
+  }
+
   /// Sends the image to n8n webhook, then backend OCR (/api/documents/scan-ocr),
-  /// and Gemini AI. Never returns fake hardcoded template data.
+  /// and Gemini AI. Returns extracted fields strictly from the document.
   static Future<Map<String, dynamic>> extractImageInfo({
     required File imageFile,
     String? customWebhookUrl,
@@ -39,7 +82,54 @@ class N8nService {
         debugPrint('N8nService: Probing n8n endpoint: $endpoint');
         final uri = Uri.parse(endpoint);
 
-        // Try multipart upload (matching n8n binaryPropertyName = "file")
+        // First attempt: JSON body (matching Capture_image_info json schema)
+        try {
+          final jsonRes = await http
+              .post(
+                uri,
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'imagebase64': base64Image,
+                  'imageBase64': base64Image,
+                  'mimeType': mimeType,
+                  'fileName': fileName,
+                  'docType': docType,
+                }),
+              )
+              .timeout(const Duration(seconds: 15));
+
+          if (jsonRes.statusCode == 200 && jsonRes.body.isNotEmpty) {
+            debugPrint('N8nService: n8n JSON responded: ${jsonRes.body}');
+            final decoded = jsonDecode(jsonRes.body);
+            if (decoded is Map<String, dynamic>) {
+              if (decoded['success'] == true && decoded['document'] != null) {
+                final doc = decoded['document'];
+                if (doc is Map<String, dynamic>) {
+                  return {
+                    'success': true,
+                    'data': normalizeDocumentData(doc),
+                    'source': 'n8n_workflow',
+                  };
+                }
+              } else if (decoded.containsKey('Name') ||
+                  decoded.containsKey('name') ||
+                  decoded.containsKey('id_number') ||
+                  decoded.containsKey('idNumber') ||
+                  decoded.containsKey('document')) {
+                final docData = decoded['document'] is Map<String, dynamic>
+                    ? decoded['document']
+                    : decoded;
+                return {
+                  'success': true,
+                  'data': normalizeDocumentData(docData),
+                  'source': 'n8n_workflow',
+                };
+              }
+            }
+          }
+        } catch (_) {}
+
+        // Second attempt: Multipart upload (matching n8n binaryPropertyName = "file")
         final request = http.MultipartRequest('POST', uri);
         request.files.add(
           http.MultipartFile.fromBytes('file', bytes, filename: fileName),
@@ -49,23 +139,31 @@ class N8nService {
         request.fields['fileName'] = fileName;
 
         final streamedRes =
-            await request.send().timeout(const Duration(seconds: 4));
+            await request.send().timeout(const Duration(seconds: 15));
         final res = await http.Response.fromStream(streamedRes);
 
         if (res.statusCode == 200 && res.body.isNotEmpty) {
-          debugPrint('N8nService: n8n responded: ${res.body}');
+          debugPrint('N8nService: n8n multipart responded: ${res.body}');
           final decoded = jsonDecode(res.body);
           if (decoded is Map<String, dynamic>) {
             if (decoded['success'] == true && decoded['document'] != null) {
               final doc = decoded['document'];
               if (doc is Map<String, dynamic>) {
-                return {'success': true, 'data': doc, 'source': 'n8n'};
+                return {
+                  'success': true,
+                  'data': normalizeDocumentData(doc),
+                  'source': 'n8n_workflow',
+                };
               }
             } else if (decoded.containsKey('Name') ||
                 decoded.containsKey('name') ||
                 decoded.containsKey('id_number') ||
                 decoded.containsKey('idNumber')) {
-              return {'success': true, 'data': decoded, 'source': 'n8n'};
+              return {
+                'success': true,
+                'data': normalizeDocumentData(decoded),
+                'source': 'n8n_workflow',
+              };
             }
           }
         }
@@ -95,20 +193,16 @@ class N8nService {
                 'fileName': fileName,
               }),
             )
-            .timeout(const Duration(seconds: 4));
+            .timeout(const Duration(seconds: 15));
 
         if (res.statusCode == 200 && res.body.isNotEmpty) {
           final decoded = jsonDecode(res.body);
           if (decoded is Map<String, dynamic> && decoded['document'] != null) {
             final doc = decoded['document'];
-            if (doc is Map<String, dynamic> &&
-                (doc.containsKey('id_number') ||
-                    doc.containsKey('full_name_bn') ||
-                    doc.containsKey('dob') ||
-                    doc.containsKey('doc_title'))) {
+            if (doc is Map<String, dynamic>) {
               return {
                 'success': true,
-                'data': doc,
+                'data': normalizeDocumentData(doc),
                 'source': decoded['source'] ?? 'backend_ocr',
               };
             }
@@ -134,7 +228,23 @@ class N8nService {
               'parts': [
                 {
                   'text':
-                      'Extract all text and details from this Bangladeshi citizen ID card or document (such as Name, Bengali Name, NID/ID Number, Date of Birth, Father Name, Mother Name, Blood Group, Address, Issue Date) and return strictly a valid JSON object with key-value pairs without markdown code blocks.',
+                      '''Extract all text and details from this Bangladeshi citizen ID card, admit card, certificate or document (such as Name, Bengali Name, Roll, Registration Number, NID/ID Number, Date of Birth, Father Name, Mother Name, Blood Group, Address, Issue Date).
+Return strictly a valid JSON object without markdown code blocks with the keys:
+{
+  "doc_title": "Detected Title",
+  "full_name_bn": "Bengali Name if present",
+  "full_name_en": "English Name",
+  "id_number": "NID or Certificate ID Number",
+  "roll": "Roll number if admit card",
+  "reg_no": "Registration number if present",
+  "board": "Education board if present",
+  "dob": "Date of Birth (DD/MM/YYYY)",
+  "father_name": "Father's Name",
+  "mother_name": "Mother's Name",
+  "blood_group": "Blood group",
+  "address": "Address",
+  "business_name": "Business name if trade license"
+}''',
                 },
                 {
                   'inline_data': {
@@ -153,7 +263,7 @@ class N8nService {
               headers: {'Content-Type': 'application/json'},
               body: requestBody,
             )
-            .timeout(const Duration(seconds: 10));
+            .timeout(const Duration(seconds: 15));
 
         if (geminiRes.statusCode == 200) {
           final decoded = jsonDecode(geminiRes.body);
@@ -181,7 +291,7 @@ class N8nService {
                 if (parsedDoc is Map<String, dynamic>) {
                   return {
                     'success': true,
-                    'data': parsedDoc,
+                    'data': normalizeDocumentData(parsedDoc),
                     'source': 'gemini_vision',
                   };
                 }
@@ -194,9 +304,7 @@ class N8nService {
       }
     }
 
-    // ─── 4. REAL DOCUMENT SKELETON (NO FAKE TEMPLATE DATA) ─────────────────
-    // Instead of fake person "Mohammad Karim / 7392819283719", we return
-    // real metadata derived from the uploaded file so user can review and edit.
+    // ─── 4. SKELETON WITH REAL FILENAME & DATE ─────────────────────────────
     final docTitles = {
       'nid_front': 'গণপ্রজাতন্ত্রী বাংলাদেশ সরকার - জাতীয় পরিচয়পত্র',
       'nid_back': 'জাতীয় পরিচয়পত্র (পেছনের অংশ)',

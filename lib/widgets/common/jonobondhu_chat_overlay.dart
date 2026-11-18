@@ -12,6 +12,7 @@ import '../../screens/opportunities_screen.dart';
 import '../../screens/service_detail_screen.dart';
 import '../../screens/about_screen.dart';
 import '../../services/agent_service.dart';
+import 'jonobondhu_mascot.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 class ChatMessage {
@@ -692,11 +693,15 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                                 border: Border.all(
-                                    color: AppColors.border, width: 1.5),
+                                    color: AppColors.primaryGreen, width: 1.5),
                               ),
-                              padding: const EdgeInsets.all(4),
-                              child: SvgPicture.asset(
-                                  'assets/icons/jonobondhu.svg'),
+                              padding: const EdgeInsets.all(2),
+                              child: ClipOval(
+                                child: Image.asset(
+                                  'assets/mascot/jonobondhu_head.png',
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
                             ),
                             const SizedBox(width: 10),
                             Text(
@@ -1053,14 +1058,16 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                 height: 34,
                                 decoration: BoxDecoration(
                                   color: Colors.white,
-                                  borderRadius: BorderRadius.zero,
+                                  shape: BoxShape.circle,
                                   border: Border.all(
-                                      color: AppColors.border, width: 1),
+                                      color: AppColors.primaryGreen, width: 1.5),
                                 ),
-                                padding: const EdgeInsets.all(4),
-                                child: SvgPicture.asset(
-                                  'assets/icons/jonobondhu.svg',
-                                  fit: BoxFit.contain,
+                                padding: const EdgeInsets.all(2),
+                                child: ClipOval(
+                                  child: Image.asset(
+                                    'assets/mascot/jonobondhu_head.png',
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 10),
@@ -1302,14 +1309,16 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                                       const EdgeInsets.only(right: 8, top: 2),
                                   decoration: BoxDecoration(
                                     color: Colors.white,
-                                    borderRadius: BorderRadius.zero,
+                                    shape: BoxShape.circle,
                                     border: Border.all(
                                         color: AppColors.border, width: 1),
                                   ),
-                                  padding: const EdgeInsets.all(3),
-                                  child: SvgPicture.asset(
-                                    'assets/icons/jonobondhu.svg',
-                                    fit: BoxFit.contain,
+                                  padding: const EdgeInsets.all(1.5),
+                                  child: ClipOval(
+                                    child: Image.asset(
+                                      'assets/mascot/jonobondhu_head.png',
+                                      fit: BoxFit.contain,
+                                    ),
                                   ),
                                 ),
                                 Expanded(
@@ -1791,25 +1800,34 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 66,
+                    height: 84,
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                      border:
-                          Border.all(color: AppColors.primaryGreen, width: 2.5),
+                      color: Colors.white.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: AppColors.primaryGreen,
+                        width: 2,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.22),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
+                          color: const Color(0xFF006A4E).withValues(alpha: 0.28),
+                          blurRadius: 14,
+                          offset: const Offset(0, 6),
                         ),
                       ],
                     ),
-                    padding: const EdgeInsets.all(8),
-                    child: SvgPicture.asset(
-                      'assets/icons/jonobondhu.svg',
-                      fit: BoxFit.contain,
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: JonobondhuMascot(
+                      side: (_x + 30 < screenW / 2)
+                          ? MascotSide.left
+                          : MascotSide.right,
+                      isListening: _isListening,
+                      isOpen: _isChatOpen,
+                      isSpeaking: _isTyping,
+                      width: 58,
+                      height: 72,
+                      onTap: _openChatDialog,
                     ),
                   ),
 
@@ -1818,8 +1836,8 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                     top: 2,
                     right: 2,
                     child: Container(
-                      width: 13,
-                      height: 13,
+                      width: 12,
+                      height: 12,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppColors.accentGreen,
@@ -1836,8 +1854,12 @@ class _JonobondhuChatOverlayState extends State<JonobondhuChatOverlay> {
                     child: Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1.5),
-                        color: AppColors.darkGreen,
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.darkGreen,
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
                         child: Text(
                           isBn ? 'জনবন্ধু AI' : 'Jonobondhu',
                           style: GoogleFonts.notoSansBengali(

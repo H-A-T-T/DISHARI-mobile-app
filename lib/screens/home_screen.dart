@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../config/constants.dart';
+import '../providers/auth_provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/services_provider.dart';
 import '../widgets/home/hero_section.dart';
@@ -10,6 +11,7 @@ import '../widgets/home/weather_advisory.dart';
 import '../widgets/home/category_grid.dart';
 import '../widgets/home/featured_services.dart';
 import '../widgets/home/how_it_works.dart';
+import '../widgets/home/personalized_feed.dart';
 import 'service_detail_screen.dart';
 import 'opportunities_screen.dart';
 
@@ -24,9 +26,11 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final langProvider = context.watch<LanguageProvider>();
+    final auth = context.watch<AuthProvider>();
     final servicesProvider =
         Provider.of<ServicesProvider>(context, listen: false);
     final isBn = langProvider.isBn;
+    final isLoggedIn = auth.isLoggedIn && auth.user != null;
 
     return SingleChildScrollView(
       child: Column(
@@ -49,7 +53,7 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
 
-          // 2. Stats Section (Windows 10 Flat Metric Tiles)
+          // 2. Stats Section (Windows 10 Flat Metric Tiles & Live Gazette Ticker)
           const StatsSection(),
           const SizedBox(height: 8),
 
@@ -57,39 +61,44 @@ class HomeScreen extends StatelessWidget {
           const WeatherAdvisory(),
           const SizedBox(height: 8),
 
-          // 4. Categories Grid (Mirrors web CategoryGrid.tsx)
-          CategoryGrid(
-            onSelectCategory: (slug) {
-              servicesProvider.setCategory(slug);
-              onNavigateTab(1); // Navigate to Services tab
-            },
-            onViewAll: () {
-              servicesProvider.clearFilters();
-              onNavigateTab(1);
-            },
-          ),
-          const SizedBox(height: 8),
+          // 4. Dynamic Section: Personalized Feed if logged in, otherwise Public Catalog
+          if (isLoggedIn) ...[
+            PersonalizedFeed(onNavigateTab: onNavigateTab),
+          ] else ...[
+            // Categories Grid (Mirrors web CategoryGrid.tsx)
+            CategoryGrid(
+              onSelectCategory: (slug) {
+                servicesProvider.setCategory(slug);
+                onNavigateTab(1); // Navigate to Services tab
+              },
+              onViewAll: () {
+                servicesProvider.clearFilters();
+                onNavigateTab(1);
+              },
+            ),
+            const SizedBox(height: 8),
 
-          // 5. How It Works Flow (Mirrors web HowItWorks.tsx)
-          const HowItWorks(),
-          const SizedBox(height: 8),
+            // How It Works Flow (Mirrors web HowItWorks.tsx)
+            const HowItWorks(),
+            const SizedBox(height: 8),
 
-          // 6. Featured Popular Services (Mirrors web FeaturedServices.tsx)
-          FeaturedServices(
-            onSelectService: (slug) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ServiceDetailScreen(slug: slug),
-                ),
-              );
-            },
-            onViewAll: () {
-              servicesProvider.clearFilters();
-              onNavigateTab(1);
-            },
-          ),
-          const SizedBox(height: 8),
+            // Featured Popular Services (Mirrors web FeaturedServices.tsx)
+            FeaturedServices(
+              onSelectService: (slug) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ServiceDetailScreen(slug: slug),
+                  ),
+                );
+              },
+              onViewAll: () {
+                servicesProvider.clearFilters();
+                onNavigateTab(1);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
 
           // 7. Government Opportunities Banner
           Container(

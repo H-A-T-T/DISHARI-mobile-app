@@ -36,6 +36,8 @@ flutter:
   assets:
     - .env
     - assets/icons/
+    - assets/mascot/
+    - assets/mascot/frames/
 
 
 flutter_launcher_icons:

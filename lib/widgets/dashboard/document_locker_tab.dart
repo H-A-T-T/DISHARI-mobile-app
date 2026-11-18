@@ -117,19 +117,33 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
 
               if (platformFile != null && platformFile.path != null) {
                 final file = File(platformFile.path!);
+                final name = platformFile.name.toLowerCase();
+                final isImg = name.endsWith('.jpg') ||
+                    name.endsWith('.jpeg') ||
+                    name.endsWith('.png') ||
+                    name.endsWith('.webp');
+
+                if (isImg && context.mounted) {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ImageVerificationScreen(
+                        initialImageFile: file,
+                        initialDocType: selectedType,
+                      ),
+                    ),
+                  );
+                  return;
+                }
 
                 setDialogState(() {
                   selectedLocalFile = file;
                   selectedFileName = platformFile.name;
                   selectedFileSize = file.lengthSync();
 
-                  final name = platformFile.name.toLowerCase();
                   if (name.endsWith('.pdf')) {
                     selectedMimeType = 'application/pdf';
-                  } else if (name.endsWith('.png')) {
-                    selectedMimeType = 'image/png';
-                  } else if (name.endsWith('.jpg') || name.endsWith('.jpeg')) {
-                    selectedMimeType = 'image/jpeg';
                   } else {
                     selectedMimeType = 'application/octet-stream';
                   }

@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import '../config/constants.dart';
 import '../models/document.dart';
+import '../providers/auth_provider.dart';
 import '../providers/dashboard_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/n8n_service.dart';
@@ -217,10 +218,13 @@ class _ImageVerificationScreenState extends State<ImageVerificationScreen> {
   Future<void> _approveAndSave() async {
     final lang = Provider.of<LanguageProvider>(context, listen: false);
     final isBn = lang.isBn;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     final dashboard = Provider.of<DashboardProvider>(context, listen: false);
 
     final meta = _collectMetadata();
     final docType = _detectDocType(meta);
+    final fileName = _currentImageFile.path.split(Platform.pathSeparator).last;
+    final fileSize = _currentImageFile.lengthSync();
 
     // Read bytes for base64 fileData
     String fileDataStr = '';
@@ -229,20 +233,31 @@ class _ImageVerificationScreenState extends State<ImageVerificationScreen> {
       fileDataStr = base64Encode(bytes);
     } catch (_) {}
 
+    final userId = auth.user?.id ?? 1;
+
+    // Save to server & local cache via dashboard provider
+    await dashboard.uploadDocument(
+      userId: userId,
+      docType: docType,
+      fileName: fileName,
+      fileSize: fileSize,
+      mimeType: 'image/jpeg',
+      fileData: fileDataStr,
+      extractedMeta: meta,
+    );
+
     final newDoc = CitizenDocument(
       id: DateTime.now().millisecondsSinceEpoch,
-      userId: 1,
+      userId: userId,
       docType: docType,
-      fileName: _currentImageFile.path.split(Platform.pathSeparator).last,
-      fileSize: _currentImageFile.lengthSync(),
+      fileName: fileName,
+      fileSize: fileSize,
       mimeType: 'image/jpeg',
       verified: true,
       extractedMeta: meta,
       uploadedAt: DateTime.now().toIso8601String(),
       fileData: fileDataStr,
     );
-
-    dashboard.addVerifiedDocument(newDoc);
 
     if (!mounted) return;
 

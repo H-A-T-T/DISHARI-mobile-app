@@ -86,6 +86,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> loginWithCitizenProfile(UserProfile profile) async {
+    await StorageService.saveUser(profile);
+    _user = profile;
+    _isLoggedIn = true;
+    _citizenId = profile.citizenId;
+    _isLoading = false;
+    notifyListeners();
+  }
+
   Future<void> loginAsDemoCitizen() async {
     final demo = SeedData.demoUser;
     await StorageService.saveUser(demo);
