@@ -43,54 +43,17 @@ class _SmartBagCheckerState extends State<SmartBagChecker> {
 
   void _initializeAutoChecks() {
     if (_internalChecked.isNotEmpty) return;
-
     final initial = <int, bool>{};
     for (int i = 0; i < widget.service.requiredDocs.length; i++) {
-      final doc = widget.service.requiredDocs[i];
-      final docName = '${doc.nameEn} ${doc.nameBn}'.toLowerCase();
-
-      final hasInLocker = widget.userLockerDocTypes.any((t) {
-        if (t.contains('nid') &&
-            (docName.contains('nid') || docName.contains('পরিচয়'))) {
-          return true;
-        }
-        if (t.contains('birth') &&
-            (docName.contains('birth') || docName.contains('জন্ম'))) {
-          return true;
-        }
-        if (t.contains('photo') &&
-            (docName.contains('photo') || docName.contains('ছবি'))) {
-          return true;
-        }
-        if (t.contains('tin') &&
-            (docName.contains('tin') || docName.contains('কর') || docName.contains('টিআইএন'))) {
-          return true;
-        }
-        if (t.contains('trade') &&
-            (docName.contains('trade') || docName.contains('লাইসেন্স'))) {
-          return true;
-        }
-        if (t.contains('citizenship') &&
-            (docName.contains('citizenship') || docName.contains('নাগরিকত্ব'))) {
-          return true;
-        }
-        return false;
-      });
-
-      if (hasInLocker) {
+      if (_isDocInLocker(widget.service.requiredDocs[i])) {
         initial[i] = true;
       }
     }
-
-    if (initial.isNotEmpty) {
-      _updateChecked(initial);
-    }
+    if (initial.isNotEmpty) _updateChecked(initial);
   }
 
   void _updateChecked(Map<int, bool> newChecked) {
-    setState(() {
-      _internalChecked = newChecked;
-    });
+    setState(() => _internalChecked = newChecked);
     widget.onCheckedChange?.call(newChecked);
   }
 
@@ -112,44 +75,84 @@ class _SmartBagCheckerState extends State<SmartBagChecker> {
     final docName = '${doc.nameEn} ${doc.nameBn}'.toLowerCase();
     return widget.userLockerDocTypes.any((t) {
       if (t.contains('nid') &&
-          (docName.contains('nid') || docName.contains('পরিচয়'))) {
-        return true;
-      }
+          (docName.contains('nid') || docName.contains('পরিচয়'))) return true;
       if (t.contains('birth') &&
-          (docName.contains('birth') || docName.contains('জন্ম'))) {
-        return true;
-      }
+          (docName.contains('birth') || docName.contains('জন্ম'))) return true;
       if (t.contains('photo') &&
-          (docName.contains('photo') || docName.contains('ছবি'))) {
-        return true;
-      }
+          (docName.contains('photo') || docName.contains('ছবি'))) return true;
       if (t.contains('tin') &&
-          (docName.contains('tin') || docName.contains('কর') || docName.contains('টিআইএন'))) {
-        return true;
-      }
+          (docName.contains('tin') ||
+              docName.contains('কর') ||
+              docName.contains('টিআইএন'))) return true;
       if (t.contains('trade') &&
-          (docName.contains('trade') || docName.contains('লাইসেন্স'))) {
+          (docName.contains('trade') || docName.contains('লাইসেন্স')))
         return true;
-      }
       if (t.contains('citizenship') &&
-          (docName.contains('citizenship') || docName.contains('নাগরিকত্ব'))) {
+          (docName.contains('citizenship') || docName.contains('নাগরিকত্ব')))
         return true;
-      }
       return false;
     });
   }
 
+  String _copyTypeLabel(String type, bool isBn) {
+    switch (type) {
+      case 'original':
+        return isBn ? 'মূল কপি প্রয়োজন' : 'Original Required';
+      case 'photocopy':
+        return isBn ? 'সত্যায়িত ফটোকপি' : 'Attested Photocopy';
+      case 'both':
+        return isBn ? 'মূল + ফটোকপি উভয়ই' : 'Both Original & Copy';
+      default:
+        return isBn ? 'অনলাইন প্রিন্ট কপি' : 'Digital / Online Copy';
+    }
+  }
+
+  Color _copyTypeBg(String type) {
+    switch (type) {
+      case 'original':
+        return const Color(0xFFD1FAE5);
+      case 'photocopy':
+        return const Color(0xFFDBEAFE);
+      case 'both':
+        return const Color(0xFFFEF3C7);
+      default:
+        return const Color(0xFFF3E8FF);
+    }
+  }
+
+  Color _copyTypeFg(String type) {
+    switch (type) {
+      case 'original':
+        return const Color(0xFF065F46);
+      case 'photocopy':
+        return const Color(0xFF1E40AF);
+      case 'both':
+        return const Color(0xFF92400E);
+      default:
+        return const Color(0xFF6B21A8);
+    }
+  }
+
+  Color _copyTypeBorder(String type) {
+    switch (type) {
+      case 'original':
+        return const Color(0xFF6EE7B7);
+      case 'photocopy':
+        return const Color(0xFF93C5FD);
+      case 'both':
+        return const Color(0xFFFCD34D);
+      default:
+        return const Color(0xFFD8B4FE);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final langProvider = context.watch<LanguageProvider>();
-    final isBn = langProvider.isBn;
-
+    final isBn = context.watch<LanguageProvider>().isBn;
     final totalDocs = widget.service.requiredDocs.length;
-    final checkedCount =
-        _internalChecked.values.where((checked) => checked).length;
-    final percentReady = totalDocs > 0
-        ? ((checkedCount / totalDocs) * 100).round()
-        : 100;
+    final checkedCount = _internalChecked.values.where((v) => v).length;
+    final percentReady =
+        totalDocs > 0 ? ((checkedCount / totalDocs) * 100).round() : 100;
 
     return Container(
       decoration: BoxDecoration(
@@ -159,10 +162,9 @@ class _SmartBagCheckerState extends State<SmartBagChecker> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top Banner (Bangladesh Flag Green with Red Accent)
           Container(
             color: AppColors.darkGreen,
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -170,64 +172,95 @@ class _SmartBagCheckerState extends State<SmartBagChecker> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGreen,
-                        border: Border.all(color: const Color(0xFF34D399)),
-                      ),
-                      child: const Icon(
-                        Icons.work_outline,
-                        color: Color(0xFFA7F3D0),
-                        size: 20,
-                      ),
+                      width: 40,
+                      height: 40,
+                      color: AppColors.primaryGreen,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.work_outline,
+                          color: Color(0xFFA7F3D0), size: 20),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            crossAxisAlignment: WrapCrossAlignment.center,
                             children: [
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
+                                    horizontal: 8, vertical: 2),
                                 color: AppColors.primaryRed,
                                 child: Text(
-                                  isBn ? 'প্রস্তুতি মিটার' : 'PRE-FLIGHT CHECK',
+                                  isBn
+                                      ? 'প্রস্তুতি মিটার'
+                                      : 'PRE-FLIGHT BAG CHECK',
                                   style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 9,
+                                    fontSize: 10,
                                     fontWeight: FontWeight.w800,
                                     color: Colors.white,
-                                    letterSpacing: 0.5,
+                                    letterSpacing: 0.6,
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
-                              Expanded(
-                                child: Text(
-                                  isBn
-                                      ? 'কম্পিউটার দোকানে যাওয়ার আগে'
-                                      : 'Before visiting service desk',
-                                  style: GoogleFonts.notoSansBengali(
-                                    fontSize: 10,
-                                    color: const Color(0xFFA7F3D0),
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                              Text(
+                                isBn
+                                    ? 'কম্পিউটার দোকানে যাওয়ার আগে'
+                                    : 'Before visiting service desk',
+                                style: GoogleFonts.notoSansBengali(
+                                    fontSize: 11,
+                                    color: const Color(0xFFA7F3D0)),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
                             isBn
                                 ? '“আমার ব্যাগে সব কাগজ আছে তো?”'
                                 : '"Do I have all documents in my bag?"',
                             style: GoogleFonts.notoSansBengali(
-                              fontSize: 15,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
+                              height: 1.3,
                             ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.1),
+                        border: Border.all(
+                            color:
+                                const Color(0xFF6EE7B7).withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            isBn ? 'প্রস্তুতি অগ্রগতি' : 'Readiness Score',
+                            style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10,
+                                color: const Color(0xFFA7F3D0),
+                                fontWeight: FontWeight.w600),
+                          ),
+                          Text(
+                            '$percentReady%',
+                            style: GoogleFonts.plusJakartaSans(
+                                fontSize: 22,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white),
+                          ),
+                          Text(
+                            '($checkedCount/$totalDocs)',
+                            style: GoogleFonts.plusJakartaSans(
+                                fontSize: 10, color: const Color(0xFFA7F3D0)),
                           ),
                         ],
                       ),
@@ -235,274 +268,237 @@ class _SmartBagCheckerState extends State<SmartBagChecker> {
                   ],
                 ),
                 const SizedBox(height: 14),
-
-                // Readiness Progress Bar
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  color: const Color(0xFF064E3B),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                color: percentReady == 100
-                                    ? AppColors.primaryGreen
-                                    : percentReady >= 50
-                                        ? Colors.amber[700]
-                                        : AppColors.primaryRed,
-                                child: Text(
-                                  '${isBn ? AppConstants.toBengaliNumber(percentReady) : percentReady}% ${isBn ? "প্রস্তুত" : "Ready"}',
-                                  style: GoogleFonts.notoSansBengali(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                isBn
-                                    ? '${AppConstants.toBengaliNumber(checkedCount)}/${AppConstants.toBengaliNumber(totalDocs)} কাগজ ব্যাগে রাখা হয়েছে'
-                                    : '$checkedCount of $totalDocs docs in bag',
-                                style: GoogleFonts.notoSansBengali(
-                                  fontSize: 11,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      // Progress Bar
-                      ClipRRect(
-                        borderRadius: BorderRadius.zero,
-                        child: LinearProgressIndicator(
-                          value: totalDocs > 0 ? checkedCount / totalDocs : 1.0,
-                          minHeight: 6,
-                          backgroundColor: const Color(0xFF042F2E),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            percentReady == 100
-                                ? const Color(0xFF34D399)
-                                : percentReady >= 50
-                                    ? Colors.amber[400]!
-                                    : Colors.red[300]!,
-                          ),
-                        ),
-                      ),
-                    ],
+                LinearProgressIndicator(
+                  value: totalDocs > 0 ? checkedCount / totalDocs : 1.0,
+                  minHeight: 8,
+                  backgroundColor: Colors.black.withValues(alpha: 0.25),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    percentReady == 100
+                        ? const Color(0xFF34D399)
+                        : percentReady >= 50
+                            ? const Color(0xFFFBBF24)
+                            : const Color(0xFFF87171),
                   ),
                 ),
               ],
             ),
           ),
-
-          // Control Toolbar (Select All / Reset)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: const BoxDecoration(
-              color: AppColors.bgMuted,
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: percentReady == 100
+                  ? const Color(0xFFECFDF5)
+                  : percentReady >= 50
+                      ? const Color(0xFFFFFBEB)
+                      : const Color(0xFFFFF1F2),
               border: Border(
-                bottom: BorderSide(color: AppColors.border, width: 1),
+                bottom: BorderSide(
+                  color: percentReady == 100
+                      ? const Color(0xFFA7F3D0)
+                      : percentReady >= 50
+                          ? const Color(0xFFFDE68A)
+                          : const Color(0xFFFECDD3),
+                ),
               ),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isBn ? 'কাগজপত্রের চেকলিস্ট' : 'Document Checklist',
-                  style: GoogleFonts.notoSansBengali(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
+                Icon(
+                  percentReady == 100
+                      ? Icons.check_circle
+                      : Icons.warning_amber_rounded,
+                  size: 16,
+                  color: percentReady == 100
+                      ? AppColors.primaryGreen
+                      : AppColors.amber500,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    percentReady == 100
+                        ? (isBn
+                            ? 'দারুণ! সব প্রয়োজনীয় কাগজপত্র আপনার ব্যাগে প্রস্তুত। আপনি এখন সেবা কেন্দ্রে যেতে পারেন।'
+                            : 'Excellent! All required documents are packed and ready.')
+                        : (isBn
+                            ? 'এখনো ${AppConstants.toBengaliNumber(totalDocs - checkedCount)}টি জরুরি নথি প্রস্তুত করা বাকি রয়েছে। তালিকা মিলিয়ে ব্যাগে রাখুন।'
+                            : 'Still missing ${totalDocs - checkedCount} required document(s). Pack them before leaving.'),
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: percentReady == 100
+                          ? const Color(0xFF064E3B)
+                          : const Color(0xFF78350F),
+                      height: 1.4,
+                    ),
                   ),
                 ),
-                Row(
-                  children: [
-                    InkWell(
-                      onTap: () => _markAll(true),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 4),
-                        child: Text(
-                          isBn ? 'সব প্রস্তুত' : 'Select All',
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primaryGreen,
-                          ),
-                        ),
-                      ),
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: () => _markAll(percentReady != 100),
+                  child: Text(
+                    percentReady == 100
+                        ? (isBn ? 'সব মুছুন' : 'Reset')
+                        : (isBn ? 'সব সিলেক্ট করুন' : 'Select All'),
+                    style: GoogleFonts.notoSansBengali(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      decoration: TextDecoration.underline,
+                      color: AppColors.textPrimary,
                     ),
-                    const SizedBox(width: 10),
-                    InkWell(
-                      onTap: () => _markAll(false),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 4),
-                        child: Text(
-                          isBn ? 'রিসেট' : 'Reset',
-                          style: GoogleFonts.notoSansBengali(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
               ],
             ),
           ),
-
-          // Document Checklist Items
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(14),
             itemCount: widget.service.requiredDocs.length,
             separatorBuilder: (_, __) =>
-                const Divider(height: 1, color: AppColors.border),
+                const Divider(height: 20, color: AppColors.border),
             itemBuilder: (context, idx) {
               final doc = widget.service.requiredDocs[idx];
-              final isChecked = _internalChecked[idx] ?? false;
-              final isInLocker = _isDocInLocker(doc);
-
+              final isPacked = _internalChecked[idx] ?? false;
+              final inLocker = _isDocInLocker(doc);
               return InkWell(
                 onTap: () => _toggleDoc(idx),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
-                  color: isChecked ? AppColors.lightGreen50 : AppColors.bgSurface,
+                  color: isPacked
+                      ? const Color(0xFFECFDF5).withValues(alpha: 0.4)
+                      : Colors.transparent,
+                  padding: const EdgeInsets.symmetric(vertical: 2),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Checkbox Icon
                       Padding(
                         padding: const EdgeInsets.only(top: 2, right: 10),
                         child: Icon(
-                          isChecked
-                              ? Icons.check_box
-                              : Icons.check_box_outline_blank,
+                          isPacked
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
                           size: 20,
-                          color: isChecked
+                          color: isPacked
                               ? AppColors.primaryGreen
                               : AppColors.textMuted,
                         ),
                       ),
-
-                      // Document Info
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              isBn ? doc.nameBn : doc.nameEn,
-                              style: GoogleFonts.notoSansBengali(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                                color: isChecked
-                                    ? AppColors.textMuted
-                                    : AppColors.textPrimary,
-                                decoration: isChecked
-                                    ? TextDecoration.lineThrough
-                                    : TextDecoration.none,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-
-                            // Badge Pills Row
                             Wrap(
                               spacing: 6,
                               runSpacing: 4,
+                              crossAxisAlignment: WrapCrossAlignment.center,
                               children: [
-                                // Copy Type Badge
+                                Text(
+                                  isBn
+                                      ? doc.nameBn
+                                      : (doc.nameEn.isNotEmpty
+                                          ? doc.nameEn
+                                          : doc.nameBn),
+                                  style: GoogleFonts.notoSansBengali(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                    decoration: isPacked
+                                        ? TextDecoration.lineThrough
+                                        : null,
+                                    decorationColor: AppColors.primaryGreen,
+                                    decorationThickness: 2,
+                                  ),
+                                ),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 6, vertical: 2),
-                                  color: doc.copyType == 'original'
-                                      ? AppColors.lightGreen50
-                                      : doc.copyType == 'photocopy'
-                                          ? const Color(0xFFEFF6FF)
-                                          : doc.copyType == 'both'
-                                              ? AppColors.amber50
-                                              : const Color(0xFFFAF5FF),
+                                  decoration: BoxDecoration(
+                                    color: _copyTypeBg(doc.copyType),
+                                    border: Border.all(
+                                        color: _copyTypeBorder(doc.copyType)),
+                                  ),
                                   child: Text(
-                                    doc.copyType == 'original'
-                                        ? (isBn ? 'মূল কপি প্রয়োজন' : 'Original Required')
-                                        : doc.copyType == 'photocopy'
-                                            ? (isBn ? 'সত্যায়িত ফটোকপি' : 'Attested Photocopy')
-                                            : doc.copyType == 'both'
-                                                ? (isBn ? 'মূল + ফটোকপি উভয়ই' : 'Both Original & Copy')
-                                                : (isBn ? 'অনলাইন প্রিন্ট কপি' : 'Digital / Online Copy'),
+                                    _copyTypeLabel(doc.copyType, isBn),
                                     style: GoogleFonts.notoSansBengali(
-                                      fontSize: 9,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w700,
-                                      color: doc.copyType == 'original'
-                                          ? AppColors.darkGreen
-                                          : doc.copyType == 'photocopy'
-                                              ? const Color(0xFF1E40AF)
-                                              : doc.copyType == 'both'
-                                                  ? Colors.amber[900]
-                                                  : const Color(0xFF6B21A8),
+                                      color: _copyTypeFg(doc.copyType),
                                     ),
                                   ),
                                 ),
-
-                                // In Locker Badge
-                                if (isInLocker)
+                                if (inLocker)
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 6, vertical: 2),
-                                    color: AppColors.lightGreen50,
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(Icons.check,
-                                            size: 10,
-                                            color: AppColors.primaryGreen),
-                                        const SizedBox(width: 3),
-                                        Text(
-                                          isBn ? 'লকারে বিদ্যমান' : 'In Locker',
-                                          style: GoogleFonts.notoSansBengali(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.primaryGreen,
-                                          ),
-                                        ),
-                                      ],
+                                    decoration: BoxDecoration(
+                                      color: AppColors.lightGreen50,
+                                      border: Border.all(
+                                          color: const Color(0xFFA7F3D0)),
+                                    ),
+                                    child: Text(
+                                      isBn ? 'লকারে আছে' : 'In Locker',
+                                      style: GoogleFonts.notoSansBengali(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.primaryGreen,
+                                      ),
                                     ),
                                   ),
                               ],
                             ),
-
-                            // Note Callout if present
-                            if (doc.noteBn != null && doc.noteBn!.isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.amber50,
-                                  border: Border(
-                                    left: BorderSide(
-                                        color: AppColors.amber500, width: 2),
+                            if (doc.noteBn != null &&
+                                doc.noteBn!.isNotEmpty) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 1),
+                                    child: Icon(Icons.info_outline,
+                                        size: 13, color: AppColors.textMuted),
                                   ),
-                                ),
-                                child: Text(
-                                  '${isBn ? "নির্দেশনা:" : "Note:"} ${doc.noteBn!}',
-                                  style: GoogleFonts.notoSansBengali(
-                                    fontSize: 10,
-                                    color: Colors.amber[950],
-                                    height: 1.3,
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      doc.noteBn!,
+                                      style: GoogleFonts.notoSansBengali(
+                                          fontSize: 11,
+                                          color: AppColors.textSecondary,
+                                          height: 1.4),
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
                             ],
                           ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isPacked
+                              ? AppColors.primaryGreen
+                              : AppColors.bgMuted,
+                          border: Border.all(
+                              color: isPacked
+                                  ? AppColors.primaryGreen
+                                  : AppColors.border),
+                        ),
+                        child: Text(
+                          isPacked
+                              ? (isBn ? 'ব্যাগে আছে ✓' : 'Packed ✓')
+                              : (isBn ? 'বাকি' : 'Missing'),
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: isPacked
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ],
@@ -511,41 +507,19 @@ class _SmartBagCheckerState extends State<SmartBagChecker> {
               );
             },
           ),
-
-          // Footer Status Bar
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
             decoration: const BoxDecoration(
-              color: AppColors.bgMuted,
-              border: Border(
-                top: BorderSide(color: AppColors.border, width: 1),
-              ),
+              color: AppColors.bgCardSubtle,
+              border: Border(top: BorderSide(color: AppColors.border)),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  percentReady == 100
-                      ? (isBn ? '✓ আপনার ব্যাগে সব প্রস্তুত!' : '✓ All papers ready in bag!')
-                      : (isBn
-                          ? '○ দোকানে যাওয়ার আগে বাকি কাগজগুলো সংগ্রহ করুন'
-                          : '○ Complete missing papers before visiting'),
-                  style: GoogleFonts.notoSansBengali(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w600,
-                    color: percentReady == 100
-                        ? AppColors.primaryGreen
-                        : AppColors.textSecondary,
-                  ),
-                ),
-                Text(
-                  isBn ? 'ক্লিক করে টিক দিন' : 'Tap to toggle',
-                  style: GoogleFonts.notoSansBengali(
-                    fontSize: 9,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
+            child: Text(
+              isBn
+                  ? 'টিপস: কোনো কাগজ বাদ পড়লে ইউনিয়ন ডিজিটাল সেন্টার বা দোকানে ২ বার যেতে হতে পারে।'
+                  : 'Tip: Double check all original IDs before traveling to the center.',
+              style: GoogleFonts.notoSansBengali(
+                  fontSize: 11, color: AppColors.textSecondary, height: 1.4),
             ),
           ),
         ],

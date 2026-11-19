@@ -27,19 +27,19 @@ class AppTheme {
           fontSize: 32,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
-          height: 1.3,
+          height: 1.2,
         ),
         displayMedium: GoogleFonts.notoSansBengali(
           fontSize: 26,
           fontWeight: FontWeight.w800,
           color: AppColors.textPrimary,
-          height: 1.3,
+          height: 1.2,
         ),
         titleLarge: GoogleFonts.notoSansBengali(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
-          height: 1.4,
+          height: 1.3,
         ),
         titleMedium: GoogleFonts.notoSansBengali(
           fontSize: 16,
@@ -57,13 +57,13 @@ class AppTheme {
           fontSize: 16,
           fontWeight: FontWeight.w400,
           color: AppColors.textPrimary,
-          height: 1.7,
+          height: 1.6,
         ),
         bodyMedium: GoogleFonts.notoSansBengali(
           fontSize: 14,
           fontWeight: FontWeight.w400,
           color: AppColors.textSecondary,
-          height: 1.6,
+          height: 1.55,
         ),
         bodySmall: GoogleFonts.notoSansBengali(
           fontSize: 12,
@@ -74,7 +74,7 @@ class AppTheme {
         labelLarge: GoogleFonts.plusJakartaSans(
           fontSize: 13,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
+          letterSpacing: 0.4,
         ),
       ),
       appBarTheme: const AppBarTheme(
@@ -97,7 +97,8 @@ class AppTheme {
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.bgSurface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: const OutlineInputBorder(
           borderRadius: BorderRadius.zero,
           borderSide: BorderSide(color: AppColors.border, width: 1),
@@ -152,4 +153,3 @@ class AppTheme {
     );
   }
 }
-

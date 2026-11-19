@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../config/constants.dart';
@@ -27,22 +28,25 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
   final TextEditingController _searchController = TextEditingController();
 
   final List<({String type, String nameBn, String nameEn, bool required})> _docTypes = [
-    (type: 'nid_front', nameBn: 'জাতীয় পরিচয়পত্র (সামনে)', nameEn: 'National ID (Front)', required: true),
-    (type: 'nid_back', nameBn: 'জাতীয় পরিচয়পত্র (পেছনে)', nameEn: 'National ID (Back)', required: true),
+    (type: 'nid_front', nameBn: 'জাতীয় পরিচয়পত্র (সামনের অংশ)', nameEn: 'National ID (Front)', required: true),
+    (type: 'nid_back', nameBn: 'জাতীয় পরিচয়পত্র (পেছনের অংশ)', nameEn: 'National ID (Back)', required: true),
     (type: 'birth_certificate', nameBn: 'ডিজিটাল জন্ম নিবন্ধন সনদ', nameEn: 'Digital Birth Certificate', required: true),
+    (type: 'educational_transcript', nameBn: 'এডমিট কার্ড / শিক্ষাগত সনদ', nameEn: 'Admit Card / Educational Certificate', required: false),
     (type: 'photo', nameBn: 'পাসপোর্ট সাইজ ছবি', nameEn: 'Passport Size Photo', required: true),
     (type: 'tin_certificate', nameBn: 'ই-টিআইএন (e-TIN) সনদ', nameEn: 'e-TIN Certificate', required: false),
     (type: 'trade_license', nameBn: 'ই-ট্রেড লাইসেন্স', nameEn: 'e-Trade License', required: false),
-    (type: 'citizenship_certificate', nameBn: 'নাগরিকত্ব সনদপত্র', nameEn: 'Citizenship Certificate', required: false),
+    (type: 'citizenship_certificate', nameBn: 'নাগরিকত্ব / ওয়ারিশান সনদ', nameEn: 'Citizenship / Heir Certificate', required: false),
+    (type: 'other', nameBn: 'অন্যান্য প্রত্যয়নপত্র / নথি', nameEn: 'Other Certificates / Files', required: false),
   ];
 
   final List<({String id, String nameBn, String nameEn, List<String> docTypes})> _folders = [
     (id: 'all', nameBn: 'সকল নথি', nameEn: 'All Documents', docTypes: []),
-    (id: 'identity', nameBn: 'জাতীয় পরিচয় ও ছবি', nameEn: 'Identity & Photos', docTypes: ['nid_front', 'nid_back', 'photo', 'citizenship_certificate']),
-    (id: 'vital', nameBn: 'জন্ম নিবন্ধন', nameEn: 'Birth & Vital', docTypes: ['birth_certificate']),
-    (id: 'education', nameBn: 'শিক্ষা ও প্রবেশপত্র', nameEn: 'Education', docTypes: ['educational_transcript']),
-    (id: 'business', nameBn: 'ট্রেড লাইসেন্স', nameEn: 'Business & Trade', docTypes: ['trade_license']),
+    (id: 'identity', nameBn: 'জাতীয় পরিচয় ও নাগরিকত্ব', nameEn: 'Identity & Photos', docTypes: ['nid_front', 'nid_back', 'photo', 'citizenship_certificate']),
+    (id: 'vital', nameBn: 'জন্ম নিবন্ধন সনদপত্র', nameEn: 'Birth & Vital Records', docTypes: ['birth_certificate']),
+    (id: 'education', nameBn: 'শিক্ষা ও প্রবেশপত্র', nameEn: 'Education & Transcripts', docTypes: ['educational_transcript']),
+    (id: 'business', nameBn: 'ব্যবসা ও ট্রেড লাইসেন্স', nameEn: 'Business & Trade', docTypes: ['trade_license']),
     (id: 'tax', nameBn: 'কর ও রাজস্ব', nameEn: 'Tax & e-TIN', docTypes: ['tin_certificate']),
+    (id: 'other', nameBn: 'অন্যান্য নথি', nameEn: 'Other Files', docTypes: ['other']),
   ];
 
   @override
@@ -70,7 +74,7 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
               final picker = ImagePicker();
               final XFile? image = await picker.pickImage(
                 source: ImageSource.camera,
-                imageQuality: 90,
+                imageQuality: 98,
               );
 
               if (image != null && context.mounted) {
@@ -92,7 +96,7 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
               final picker = ImagePicker();
               final XFile? image = await picker.pickImage(
                 source: ImageSource.gallery,
-                imageQuality: 90,
+                imageQuality: 98,
               );
 
               if (image != null && context.mounted) {
@@ -118,12 +122,13 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
               if (platformFile != null && platformFile.path != null) {
                 final file = File(platformFile.path!);
                 final name = platformFile.name.toLowerCase();
-                final isImg = name.endsWith('.jpg') ||
+                final isSupportedDoc = name.endsWith('.jpg') ||
                     name.endsWith('.jpeg') ||
                     name.endsWith('.png') ||
-                    name.endsWith('.webp');
+                    name.endsWith('.webp') ||
+                    name.endsWith('.pdf');
 
-                if (isImg && context.mounted) {
+                if (isSupportedDoc && context.mounted) {
                   Navigator.pop(ctx);
                   Navigator.push(
                     context,
@@ -469,6 +474,27 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _showShareDocumentDialog(doc, isBn);
+                  },
+                  icon: const Icon(Icons.share, size: 16),
+                  label: Text(
+                    isBn ? 'নথি শেয়ার ও তথ্য ডকেট কপি' : 'Share Document & Docket',
+                    style: GoogleFonts.notoSansBengali(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryGreen,
+                    foregroundColor: Colors.white,
+                    shape: const RoundedRectangleBorder(),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () async {
                     Navigator.pop(ctx);
@@ -490,6 +516,177 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  void _showShareDocumentDialog(CitizenDocument doc, bool isBn) {
+    final typeTitle = CitizenDocument.getDocTypeName(doc.docType, isBn);
+    final meta = doc.extractedMeta;
+
+    final buffer = StringBuffer();
+    buffer.writeln('🏛️ দিশারী নাগরিক লকার — যাচাইকৃত নথি ডকেট');
+    buffer.writeln('• নথির ধরন: $typeTitle');
+    buffer.writeln('• ফাইলের নাম: ${doc.fileName}');
+    buffer.writeln('• এনক্রিপশন স্ট্যাটাস: AES-256 বিট দ্বারা লকারে সুরক্ষিত');
+    if (meta.isNotEmpty) {
+      buffer.writeln('\n📋 নথির উদ্ধারকৃত তথ্য:');
+      meta.forEach((key, value) {
+        if (value != null && value.toString().trim().isNotEmpty) {
+          buffer.writeln('• $key: $value');
+        }
+      });
+    }
+    buffer.writeln('\nনাগরিক রেফারেন্স আইডি: DISHARI-DOC-${doc.id}');
+    final shareDocketText = buffer.toString();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.bgSurface,
+        shape: const RoundedRectangleBorder(),
+        title: Row(
+          children: [
+            const Icon(Icons.share, size: 20, color: AppColors.primaryGreen),
+            const SizedBox(width: 8),
+            Text(
+              isBn ? 'নথি শেয়ার ও তথ্য ডকেট' : 'Share Document & Docket',
+              style: GoogleFonts.notoSansBengali(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.lightGreen50,
+                  border: Border.all(color: AppColors.primaryGreen.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.verified, color: AppColors.primaryGreen, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        isBn
+                            ? '$typeTitle — এনক্রিপ্টেড ও সরকারি সেবায় শেয়ারের উপযোগী'
+                            : '$typeTitle — Encrypted & Ready for official filing',
+                        style: GoogleFonts.notoSansBengali(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.darkGreen,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                isBn ? 'ডকেট প্রিভিউ (সরকারি ফরম বা শেয়ারের জন্য):' : 'Docket Preview:',
+                style: GoogleFonts.notoSansBengali(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.bgMuted,
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: SelectableText(
+                  shareDocketText,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 11,
+                    height: 1.4,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: shareDocketText));
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: AppColors.primaryGreen,
+                            content: Text(
+                              isBn
+                                  ? 'যাচাইকৃত নথি ডকেট সফলভাবে ক্লিপবোর্ডে কপি করা হয়েছে!'
+                                  : 'Document docket copied to clipboard!',
+                              style: GoogleFonts.notoSansBengali(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.copy, size: 14),
+                      label: Text(
+                        isBn ? 'তথ্য কপি করুন' : 'Copy Text',
+                        style: GoogleFonts.notoSansBengali(fontSize: 11, fontWeight: FontWeight.w700),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primaryGreen,
+                        foregroundColor: Colors.white,
+                        shape: const RoundedRectangleBorder(),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Clipboard.setData(ClipboardData(text: 'DISHARI-DOC-${doc.id}'));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            isBn
+                                ? 'নথি রেফারেন্স টোকেন কপি করা হয়েছে: DISHARI-DOC-${doc.id}'
+                                : 'Token copied: DISHARI-DOC-${doc.id}',
+                          ),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.qr_code, size: 14, color: AppColors.primaryGreen),
+                    label: Text(
+                      isBn ? 'টোকেন' : 'Token',
+                      style: GoogleFonts.notoSansBengali(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primaryGreen),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.primaryGreen),
+                      shape: const RoundedRectangleBorder(),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              isBn ? 'বন্ধ করুন' : 'Close',
+              style: GoogleFonts.notoSansBengali(color: AppColors.textSecondary),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -928,6 +1125,11 @@ class _DocumentLockerTabState extends State<DocumentLockerTab> {
                                 ),
                               ],
                             ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.share_outlined, size: 18, color: AppColors.primaryGreen),
+                            tooltip: isBn ? 'নথি শেয়ার করুন' : 'Share Document',
+                            onPressed: () => _showShareDocumentDialog(doc, isBn),
                           ),
                           const Icon(Icons.chevron_right, size: 18, color: AppColors.textMuted),
                         ],

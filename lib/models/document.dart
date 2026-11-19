@@ -61,11 +61,23 @@ class CitizenDocument {
   static String getDocTypeName(String type, bool isBn) {
     switch (type) {
       case 'nid_front':
-        return isBn ? 'জাতীয় পরিচয়পত্র (সামনে)' : 'National ID (Front)';
+        return isBn ? 'জাতীয় পরিচয়পত্র (সামনের অংশ)' : 'National ID (Front)';
       case 'nid_back':
-        return isBn ? 'জাতীয় পরিচয়পত্র (পেছনে)' : 'National ID (Back)';
+        return isBn ? 'জাতীয় পরিচয়পত্র (পেছনের অংশ)' : 'National ID (Back)';
       case 'birth_certificate':
         return isBn ? 'ডিজিটাল জন্ম নিবন্ধন সনদ' : 'Digital Birth Certificate';
+      case 'educational_transcript':
+        return isBn ? 'এডমিট কার্ড / শিক্ষাগত সনদ' : 'Admit Card / Educational Certificate';
+      case 'passport':
+        return isBn ? 'ই-পাসপোর্ট / বায়োমেট্রিক পাসপোর্ট' : 'e-Passport';
+      case 'driving_license':
+        return isBn ? 'ড্রাইভিং লাইসেন্স (BRTA)' : 'Driving License (BRTA)';
+      case 'utility_bill':
+        return isBn ? 'ইউটিলিটি বিল (বিদ্যুৎ/গ্যাস/পানি)' : 'Utility Bill';
+      case 'bank_statement':
+        return isBn ? 'ব্যাংক স্টেটমেন্ট' : 'Bank Statement';
+      case 'academic_certificate':
+        return isBn ? 'শিক্ষাগত মূল সনদ / ডিপ্লোমা' : 'Educational Degree / Certificate';
       case 'photo':
         return isBn ? 'পাসপোর্ট সাইজ ছবি' : 'Passport Size Photo';
       case 'tin_certificate':
@@ -73,11 +85,11 @@ class CitizenDocument {
       case 'trade_license':
         return isBn ? 'ই-ট্রেড লাইসেন্স' : 'e-Trade License';
       case 'citizenship_certificate':
-        return isBn ? 'নাগরিকত্ব / ওয়ারিশান সনদ' : 'Citizenship Certificate';
-      case 'educational_transcript':
-        return isBn ? 'শিক্ষাগত প্রশংসাপত্র/সনদ' : 'Educational Transcript';
+        return isBn ? 'নাগরিকত্ব / ওয়ারিশান সনদ' : 'Citizenship / Heir Certificate';
+      case 'other':
+        return isBn ? 'অন্যান্য প্রত্যয়নপত্র / নথি' : 'Other Certificates / Files';
       default:
-        return isBn ? 'অন্যান্য সংযুক্তি' : 'Other Document';
+        return isBn ? 'অন্যান্য প্রত্যয়নপত্র / নথি' : 'Other Certificates / Files';
     }
   }
 }

@@ -36,6 +36,8 @@ class StorageService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(keyUser);
     await prefs.setBool(keyLoggedIn, false);
+    await prefs.remove(keyCachedDocs);
+    await prefs.remove(keyCachedApps);
   }
 
   static Future<void> saveLanguage(String lang) async {

@@ -63,11 +63,11 @@ class DashboardProvider extends ChangeNotifier {
       List<CitizenDocument> localDocs = await StorageService.getDocuments();
       List<CitizenApplication> localApps = await StorageService.getApplications();
 
-      if (localDocs.isEmpty && (isDemo || userId == 1)) {
+      if (localDocs.isEmpty && isDemo) {
         localDocs = List.from(SeedData.demoDocuments);
         await StorageService.saveDocuments(localDocs);
       }
-      if (localApps.isEmpty && (isDemo || userId == 1)) {
+      if (localApps.isEmpty && isDemo) {
         localApps = List.from(SeedData.demoApplications);
         await StorageService.saveApplications(localApps);
       }
@@ -102,10 +102,10 @@ class DashboardProvider extends ChangeNotifier {
       debugPrint('Dashboard data fetch notice: $e');
       _hasError = false;
       // Guarantee fallback to seed data so screens never crash or stay blank
-      if (_documents.isEmpty && (isDemo || userId == 1)) {
+      if (_documents.isEmpty && isDemo) {
         _documents = List.from(SeedData.demoDocuments);
       }
-      if (_applications.isEmpty && (isDemo || userId == 1)) {
+      if (_applications.isEmpty && isDemo) {
         _applications = List.from(SeedData.demoApplications);
       }
       if (_deadlines.isEmpty) {

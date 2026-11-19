@@ -58,24 +58,44 @@ class _StatsSectionState extends State<StatsSection> {
 
     final impactStats = [
       {
-        'num': isBn ? '৫০+' : '50+',
-        'label': isBn ? '৫০+ সরকারি সেবা' : '50+ Govt Services',
+        'num': isBn ? '৳০' : '₳0',
+        'label': isBn ? 'ব্রোকার/লুকানো ফি' : 'Broker/Hidden Fee',
         'sub': isBn ? 'গেজেট অনুমোদিত' : 'Gazette Verified',
+        'desc': isBn
+            ? 'প্রতিটি সরকারি সেবার সঠিক সরকারি গেজেট ফি দৃশ্যমান। কোনো কম্পিউটার দোকান বা মধ্যস্বত্বভোগীর হয়রানি শূন্য।'
+            : 'Every government service shows the official gazette fee. Zero broker harassment or hidden charges.',
+        'footer': isBn ? 'গেজেট ফি যাচাই করুন →' : 'Verify gazette fees →',
+        'borderColor': AppColors.primaryGreen,
       },
       {
-        'num': isBn ? '৮' : '8',
-        'label': isBn ? '৮ বিভাগে সেবা' : '8 Divisions Covered',
-        'sub': isBn ? '৬৪ জেলা অনলাইন' : '64 Districts Active',
+        'num': isBn ? '<২ সেকেন্ড' : '<2s',
+        'label': isBn ? 'ওসিআর স্ক্যান গতি' : 'OCR Scan Speed',
+        'sub': isBn ? 'বাংলা-ইংরেজি দ্বিভাষিক' : 'Bilingual AI Engine',
+        'desc': isBn
+            ? 'স্মার্ট এনআইডি ও সনদ স্ক্যান করে মুহূর্তেই প্রস্তুত হয় সম্পূর্ণ আবেদনপত্র ও কোর্ট-রেডি ডিজিটাল কার্যপত্র।'
+            : 'Smart NID & certificate scan instantly generates complete application forms and court-ready digital documents.',
+        'footer': isBn ? 'এনআইডি স্ক্যান করুন →' : 'Try NID Scan →',
+        'borderColor': const Color(0xFF10B981),
       },
       {
-        'num': isBn ? '৩৩৩' : '333',
-        'label': isBn ? '৩৩৩ হেল্পলাইন' : '333 Helpline',
-        'sub': isBn ? '২৪/৭ ফ্রি কল' : '24/7 Toll Free',
+        'num': isBn ? '৫০+' : '50+',
+        'label': isBn ? 'সরকারি সেবা' : 'Govt Services',
+        'sub': isBn ? '৪৯৫ উপজেলা যাচাইকৃত' : '495 Upazilas Verified',
+        'desc': isBn
+            ? 'পাসপোর্ট, ভূমি নামজারি, কর, বিএমইটি প্রবাসী কার্ড ও সামাজিক ভাতা—৮ বিভাগের ৪৯৫ উপজেলার জন্য যাচাইকৃত।'
+            : 'Passport, land mutation, tax, BMET overseas card & social allowances — verified for 495 upazilas in 8 divisions.',
+        'footer': isBn ? 'সব সেবা দেখুন →' : 'Browse all services →',
+        'borderColor': const Color(0xFF06B6D4),
       },
       {
-        'num': isBn ? '১০০%' : '100%',
-        'label': isBn ? '১০০% বিনামূল্যে' : '100% Free Access',
-        'sub': isBn ? 'দালালমুক্ত পোর্টাল' : 'Broker-Free Direct',
+        'num': isBn ? '২৪/৭' : '24/7',
+        'label': isBn ? 'জনবন্ধু AI' : 'Jonobondhu AI',
+        'sub': isBn ? 'আঞ্চলিক ভাষা সহায়তা' : 'Dialect-Aware Support',
+        'desc': isBn
+            ? 'আঞ্চলিক উপভাষা ও সাধারণ বাংলায় মুখে বলুন "এনআইডি তে নিয়ে যাও" বা "পাসপোর্ট ফি কত"—মুহূর্তেই পৌঁছে যাবেন।'
+            : 'Speak naturally in any dialect: "take me to NID" or "passport fee" — instantly navigated.',
+        'footer': isBn ? 'AI-কে জিজ্ঞেস করুন →' : 'Ask Jonobondhu AI →',
+        'borderColor': const Color(0xFFF59E0B),
       },
     ];
 
@@ -201,22 +221,11 @@ class _StatsSectionState extends State<StatsSection> {
 
                 // ─── 3. Tab Contents ─────────────────────────────────────────
                 if (_activeTab == 0) ...[
-                  // Impact 4 Metric Tiles
-                  Row(
-                    children: [
-                      Expanded(child: _buildMetricTile(impactStats[0])),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildMetricTile(impactStats[1])),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(child: _buildMetricTile(impactStats[2])),
-                      const SizedBox(width: 8),
-                      Expanded(child: _buildMetricTile(impactStats[3])),
-                    ],
-                  ),
+                  // Impact 4 Metric Tiles — single column for descriptions
+                  ...impactStats.map((stat) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildMetricTile(stat),
+                  )),
                 ] else if (_activeTab == 1) ...[
                   // Official Government Gateways
                   ...gateways.map((g) {
@@ -334,12 +343,18 @@ class _StatsSectionState extends State<StatsSection> {
     );
   }
 
-  Widget _buildMetricTile(Map<String, String> item) {
+  Widget _buildMetricTile(Map<String, dynamic> item) {
+    final Color borderColor = item['borderColor'] as Color? ?? AppColors.primaryGreen;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
       decoration: BoxDecoration(
         color: AppColors.bgMuted,
-        border: Border.all(color: AppColors.border),
+        border: Border(
+          top: BorderSide(color: borderColor, width: 3),
+          left: const BorderSide(color: AppColors.border),
+          right: const BorderSide(color: AppColors.border),
+          bottom: const BorderSide(color: AppColors.border),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,7 +362,7 @@ class _StatsSectionState extends State<StatsSection> {
           Text(
             item['num']!,
             style: GoogleFonts.plusJakartaSans(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.w800,
               color: AppColors.primaryGreen,
             ),
@@ -368,6 +383,30 @@ class _StatsSectionState extends State<StatsSection> {
               color: AppColors.textMuted,
             ),
           ),
+          if (item['desc'] != null) ...[
+            const SizedBox(height: 6),
+            const Divider(height: 1, color: AppColors.border),
+            const SizedBox(height: 6),
+            Text(
+              item['desc']!,
+              style: GoogleFonts.notoSansBengali(
+                fontSize: 10,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+          ],
+          if (item['footer'] != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              item['footer']!,
+              style: GoogleFonts.notoSansBengali(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primaryGreen,
+              ),
+            ),
+          ],
         ],
       ),
     );

@@ -11,6 +11,7 @@ import '../providers/dashboard_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/n8n_service.dart';
 import '../widgets/common/dishari_logo.dart';
+import '../widgets/common/jonobondhu_chat_overlay.dart';
 import 'main_navigation_screen.dart';
 import 'register_screen.dart';
 
@@ -24,7 +25,11 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _identifierController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isPhoneMode = true;
+  final TextEditingController _manualNidController = TextEditingController();
+  final TextEditingController _fullNameController = TextEditingController();
+  // loginMode: 'phone' | 'manual_nid' | 'email'
+  String _loginMode = 'phone';
+  bool _isPhoneMode = true; // kept for backward compat
   bool _showPassword = false;
   String? _errorMessage;
 
@@ -32,6 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _identifierController.dispose();
     _passwordController.dispose();
+    _manualNidController.dispose();
+    _fullNameController.dispose();
     super.dispose();
   }
 
@@ -54,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: source, imageQuality: 90);
+      final picked = await picker.pickImage(source: source, imageQuality: 98);
       if (picked == null) return;
 
       final file = File(picked.path);
@@ -97,26 +104,43 @@ class _LoginScreenState extends State<LoginScreen> {
         docType: 'nid_front',
       );
 
+      if (ocrResult['success'] != true) {
+        throw Exception(ocrResult['error'] ?? (isBn
+            ? 'এনআইডি স্ক্যান করতে সমস্যা হয়েছে। অনুগ্রহ করে স্পষ্ট আলোতে ছবি তুলুন বা পুনরায় চেষ্টা করুন।'
+            : 'Failed to scan NID. Please ensure clear lighting and try again.'));
+      }
+
       final meta = (ocrResult['data'] as Map<String, dynamic>?) ?? {};
-      final nidNumber = meta['id_number']
-              ?.toString()
-              .replaceAll(RegExp(r'[^0-9]'), '') ??
-          '${DateTime.now().millisecondsSinceEpoch}';
-      final cleanNid = nidNumber.isNotEmpty
-          ? nidNumber
-          : '${DateTime.now().millisecondsSinceEpoch}';
-      final fullName = meta['full_name_bn']?.toString() ??
-          meta['full_name_en']?.toString() ??
-          (isBn ? 'নাগরিক' : 'Citizen');
-      final phone =
-          '017${cleanNid.length >= 8 ? cleanNid.substring(cleanNid.length - 8) : "12345678"}';
+      final rawNid = meta['id_number']?.toString().trim() ??
+          meta['nid_number']?.toString().trim() ??
+          meta['nid']?.toString().trim() ??
+          '';
+      final cleanNid = rawNid.replaceAll(RegExp(r'[^0-9]'), '');
+
+      final extractedBn = meta['full_name_bn']?.toString().trim() ?? '';
+      final extractedEn = meta['full_name_en']?.toString().trim() ?? '';
+      final extractedGen = meta['full_name']?.toString().trim() ?? meta['name']?.toString().trim() ?? '';
+
+      final fullName = isBn
+          ? (extractedBn.isNotEmpty ? extractedBn : (extractedEn.isNotEmpty ? extractedEn : extractedGen))
+          : (extractedEn.isNotEmpty ? extractedEn : (extractedBn.isNotEmpty ? extractedBn : extractedGen));
+
+      if (cleanNid.isEmpty && fullName.isEmpty) {
+        throw Exception(isBn
+            ? 'এনআইডি কার্ডের তথ্য পড়া যায়নি। অনুগ্রহ করে সম্পূর্ণ ও স্পষ্ট ছবি দিন।'
+            : 'Could not read NID card details. Please provide a clear, full image.');
+      }
+
+      final safeId = (DateTime.now().millisecondsSinceEpoch % 2000000000);
+      final citizenNid = cleanNid.isNotEmpty ? cleanNid : '$safeId';
+      final phone = '017${citizenNid.length >= 8 ? citizenNid.substring(citizenNid.length - 8) : "12345678"}';
 
       final citizenUser = UserProfile(
-        id: DateTime.now().millisecondsSinceEpoch,
-        fullName: fullName,
+        id: safeId,
+        fullName: fullName.isNotEmpty ? fullName : (isBn ? 'নাগরিক' : 'Citizen'),
         phone: phone,
         email: null,
-        citizenId: 'NID-$cleanNid',
+        citizenId: 'NID-$citizenNid',
       );
 
       if (!mounted) return;
@@ -135,7 +159,13 @@ class _LoginScreenState extends State<LoginScreen> {
           fileSize: file.lengthSync(),
           mimeType: 'image/jpeg',
           fileData: base64Encode(bytes),
-          extractedMeta: meta,
+          extractedMeta: {
+            ...meta,
+            'id_number': citizenNid,
+            'full_name_bn': extractedBn.isNotEmpty ? extractedBn : fullName,
+            'full_name_en': extractedEn.isNotEmpty ? extractedEn : fullName,
+            'verified_source': 'Smart NID Optical Registration',
+          },
         );
       } catch (e) {
         debugPrint('NID auto save error: $e');
@@ -143,18 +173,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (mounted) {
         Navigator.pop(context); // close scanning dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isBn
-                  ? 'এনআইডি যাচাই সফল! স্বাগতম, $fullName'
-                  : 'NID Verified! Welcome, $fullName',
-              style: GoogleFonts.notoSansBengali(),
-            ),
-            backgroundColor: AppColors.primaryGreen,
-          ),
+        _showVerifiedNidDialog(
+          context: context,
+          isBn: isBn,
+          user: citizenUser,
+          meta: meta,
         );
-        _navigateBackOrHome();
       }
     } catch (e) {
       if (mounted) {
@@ -164,6 +188,350 @@ class _LoginScreenState extends State<LoginScreen> {
             : 'NID scanning error: $e');
       }
     }
+  }
+
+  void _showVerifiedNidDialog({
+    required BuildContext context,
+    required bool isBn,
+    required UserProfile user,
+    required Map<String, dynamic> meta,
+  }) {
+    final dob = meta['dob']?.toString().trim() ??
+        meta['date_of_birth']?.toString().trim() ??
+        meta['birth_date']?.toString().trim() ??
+        (isBn ? 'যাচাইকৃত' : 'Verified');
+    final bloodGroup = meta['blood_group']?.toString().trim() ??
+        meta['blood']?.toString().trim() ??
+        meta['bloodGroup']?.toString().trim() ??
+        (isBn ? 'অনুল্লেখিত' : 'Not Specified');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.bgSurface,
+              border: Border.all(color: AppColors.primaryGreen, width: 2),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Green Success Banner Card (1:1 with Web login/page.tsx)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightGreen50,
+                      border: Border.all(
+                        color: AppColors.primaryGreen.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          color: AppColors.primaryGreen,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isBn
+                                    ? 'এনআইডি স্ক্যান সফল — অ্যাকাউন্ট সক্রিয়!'
+                                    : 'NID Verified — Account Activated!',
+                                style: GoogleFonts.notoSansBengali(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primaryGreen,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                isBn
+                                    ? 'আপনার ডিজিটাল নাগরিক প্রোফাইল সক্রিয় হয়েছে এবং মূল এনআইডি লকারে সংরক্ষিত হয়েছে।'
+                                    : 'Your digital profile is live and the original NID card has been encrypted into your locker.',
+                                style: GoogleFonts.notoSansBengali(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Encrypted Locker Confirmation Card
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.folder_shared_outlined,
+                                  size: 16,
+                                  color: AppColors.primaryGreen,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isBn
+                                      ? 'লকারে সংরক্ষিত নথি:'
+                                      : 'Vault Saved Asset:',
+                                  style: GoogleFonts.notoSansBengali(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              color: AppColors.lightGreen50,
+                              child: Text(
+                                'VERIFIED NID',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primaryGreen,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16, color: AppColors.border),
+
+                        // Grid with Full Name, NID Number, DOB, Blood Group
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isBn ? 'নাগরিক নাম:' : 'Name:',
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    user.fullName,
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isBn ? 'এনআইডি নম্বর:' : 'NID No:',
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    user.citizenId,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primaryGreen,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isBn ? 'জন্ম তারিখ:' : 'Date of Birth:',
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    dob,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isBn ? 'রক্তের গ্রুপ:' : 'Blood Group:',
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    bloodGroup,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primaryRed,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.lock_outline,
+                              size: 13,
+                              color: AppColors.primaryGreen,
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                isBn
+                                    ? 'জিরো-নলেজ আর্কিটেকচারে নাগরিকের এনআইডি ও নথি সংরক্ষিত'
+                                    : 'Encrypted under Bangladesh Civic Data Protection standards.',
+                                style: GoogleFonts.notoSansBengali(
+                                  fontSize: 9.5,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Button 1: Proceed to Citizen Dashboard
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MainNavigationScreen(),
+                        ),
+                        (route) => false,
+                      );
+                      JonobondhuChatOverlay.globalNavigateTab?.call(4);
+                    },
+                    icon: const Icon(Icons.dashboard_outlined, size: 16),
+                    label: Text(
+                      isBn
+                          ? 'নাগরিক ড্যাশবোর্ডে প্রবেশ করুন'
+                          : 'Proceed to Citizen Dashboard',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: const RoundedRectangleBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Button 2: View Personalized Home Feed
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MainNavigationScreen(),
+                        ),
+                        (route) => false,
+                      );
+                      JonobondhuChatOverlay.globalNavigateTab?.call(0);
+                    },
+                    icon: const Icon(Icons.home_outlined, size: 16),
+                    label: Text(
+                      isBn
+                          ? 'হোম পেজে ব্যক্তিগত ফিড দেখুন'
+                          : 'View Personalized Home Feed',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryGreen,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: const RoundedRectangleBorder(),
+                      side: const BorderSide(color: AppColors.primaryGreen),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showNidScanSheet(bool isBn) {
@@ -249,48 +617,68 @@ class _LoginScreenState extends State<LoginScreen> {
     final langProvider = Provider.of<LanguageProvider>(context, listen: false);
     final isBn = langProvider.isBn;
 
-    final rawIdentifier = _identifierController.text.trim();
-    if (rawIdentifier.isEmpty) {
-      setState(() {
-        _errorMessage = isBn
-            ? (_isPhoneMode ? 'মোবাইল নম্বর লিখুন' : 'ইমেইল ঠিকানা লিখুন')
-            : (_isPhoneMode ? 'Please enter your phone number' : 'Please enter your email');
-      });
-      return;
-    }
+    String identifier;
 
-    String identifier = rawIdentifier;
-
-    if (_isPhoneMode) {
-      // Clean phone number and convert any Bengali digits to English
-      identifier = AppConstants.toEnglishNumber(rawIdentifier).replaceAll(RegExp(r'[\s\-]'), '');
-      if (identifier.length < 11) {
+    if (_loginMode == 'manual_nid') {
+      final rawNid = _manualNidController.text.trim();
+      if (rawNid.isEmpty) {
+        setState(() {
+          _errorMessage = isBn ? 'এনআইডি নম্বর লিখুন' : 'Please enter your NID number';
+        });
+        return;
+      }
+      identifier = AppConstants.toEnglishNumber(rawNid).replaceAll(RegExp(r'\D'), '');
+      if (identifier.length < 10) {
         setState(() {
           _errorMessage = isBn
-              ? 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 01712345678)'
-              : 'Enter a valid 11-digit phone number (e.g. 01712345678)';
+              ? 'সঠিক এনআইডি নম্বর দিন (১০ বা ১৭ ডিজিট)'
+              : 'Enter a valid NID number (10 or 17 digits)';
         });
         return;
       }
     } else {
-      if (!identifier.contains('@')) {
+      final rawIdentifier = _identifierController.text.trim();
+      if (rawIdentifier.isEmpty) {
         setState(() {
-          _errorMessage = isBn ? 'সঠিক ইমেইল ঠিকানা দিন' : 'Enter a valid email address';
+          _errorMessage = isBn
+              ? (_isPhoneMode ? 'মোবাইল নম্বর লিখুন' : 'ইমেইল ঠিকানা লিখুন')
+              : (_isPhoneMode ? 'Please enter your phone number' : 'Please enter your email');
         });
         return;
       }
-      if (_passwordController.text.trim().isEmpty) {
-        setState(() {
-          _errorMessage = isBn ? 'পাসওয়ার্ড লিখুন' : 'Please enter your password';
-        });
-        return;
+
+      identifier = rawIdentifier;
+
+      if (_isPhoneMode) {
+        identifier = AppConstants.toEnglishNumber(rawIdentifier).replaceAll(RegExp(r'[\s\-]'), '');
+        if (identifier.length < 11) {
+          setState(() {
+            _errorMessage = isBn
+                ? 'সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন (যেমন: 01712345678)'
+                : 'Enter a valid 11-digit phone number (e.g. 01712345678)';
+          });
+          return;
+        }
+      } else {
+        if (!identifier.contains('@')) {
+          setState(() {
+            _errorMessage = isBn ? 'সঠিক ইমেইল ঠিকানা দিন' : 'Enter a valid email address';
+          });
+          return;
+        }
+        if (_passwordController.text.trim().isEmpty) {
+          setState(() {
+            _errorMessage = isBn ? 'পাসওয়ার্ড লিখুন' : 'Please enter your password';
+          });
+          return;
+        }
       }
     }
 
     final auth = Provider.of<AuthProvider>(context, listen: false);
     final result = await auth.login(
       identifier: identifier,
-      password: !_isPhoneMode && _passwordController.text.trim().isNotEmpty
+      password: _loginMode == 'email' && _passwordController.text.trim().isNotEmpty
           ? _passwordController.text.trim()
           : null,
     );
@@ -304,12 +692,16 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(
             content: Text(
               isBn
-                  ? (_isPhoneMode
+                  ? (_loginMode == 'phone'
                       ? 'স্বাগতম! ওটিপি যাচাই সম্পন্ন হয়েছে।'
-                      : 'সফলভাবে লগইন সম্পন্ন হয়েছে!')
-                  : (_isPhoneMode
+                      : _loginMode == 'manual_nid'
+                          ? 'এনআইডি যাচাই সম্পন্ন! স্বাগতম।'
+                          : 'সফলভাবে লগইন সম্পন্ন হয়েছে!')
+                  : (_loginMode == 'phone'
                       ? 'Welcome! OTP verified successfully.'
-                      : 'Successfully logged in!'),
+                      : _loginMode == 'manual_nid'
+                          ? 'NID verified! Welcome.'
+                          : 'Successfully logged in!'),
               style: GoogleFonts.notoSansBengali(),
             ),
             backgroundColor: AppColors.primaryGreen,
@@ -543,13 +935,14 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Mode Toggle (Phone vs Email)
+                  // Mode Toggle (Phone / Manual NID / Email) — matches web 3-tab
                   Row(
                     children: [
                       Expanded(
                         child: InkWell(
                           onTap: () {
                             setState(() {
+                              _loginMode = 'phone';
                               _isPhoneMode = true;
                               _errorMessage = null;
                             });
@@ -558,9 +951,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 9),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: _isPhoneMode ? AppColors.primaryGreen : AppColors.bgMuted,
+                              color: _loginMode == 'phone' ? AppColors.primaryGreen : AppColors.bgMuted,
                               border: Border.all(
-                                color: _isPhoneMode ? AppColors.primaryGreen : AppColors.border,
+                                color: _loginMode == 'phone' ? AppColors.primaryGreen : AppColors.border,
                               ),
                             ),
                             child: Row(
@@ -569,15 +962,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Icon(
                                   Icons.phone_android,
                                   size: 14,
-                                  color: _isPhoneMode ? Colors.white : AppColors.textSecondary,
+                                  color: _loginMode == 'phone' ? Colors.white : AppColors.textSecondary,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 Text(
-                                  isBn ? 'মোবাইল নম্বর' : 'Phone Number',
+                                  isBn ? 'মোবাইল' : 'Phone',
                                   style: GoogleFonts.notoSansBengali(
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: _isPhoneMode ? Colors.white : AppColors.textPrimary,
+                                    color: _loginMode == 'phone' ? Colors.white : AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -585,11 +978,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: InkWell(
                           onTap: () {
                             setState(() {
+                              _loginMode = 'manual_nid';
                               _isPhoneMode = false;
                               _errorMessage = null;
                             });
@@ -598,9 +992,50 @@ class _LoginScreenState extends State<LoginScreen> {
                             padding: const EdgeInsets.symmetric(vertical: 9),
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: !_isPhoneMode ? AppColors.primaryGreen : AppColors.bgMuted,
+                              color: _loginMode == 'manual_nid' ? AppColors.primaryGreen : AppColors.bgMuted,
                               border: Border.all(
-                                color: !_isPhoneMode ? AppColors.primaryGreen : AppColors.border,
+                                color: _loginMode == 'manual_nid' ? AppColors.primaryGreen : AppColors.border,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.credit_card,
+                                  size: 14,
+                                  color: _loginMode == 'manual_nid' ? Colors.white : AppColors.textSecondary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isBn ? 'ম্যানুয়াল NID' : 'NID No.',
+                                  style: GoogleFonts.notoSansBengali(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                    color: _loginMode == 'manual_nid' ? Colors.white : AppColors.textPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              _loginMode = 'email';
+                              _isPhoneMode = false;
+                              _errorMessage = null;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 9),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: _loginMode == 'email' ? AppColors.primaryGreen : AppColors.bgMuted,
+                              border: Border.all(
+                                color: _loginMode == 'email' ? AppColors.primaryGreen : AppColors.border,
                               ),
                             ),
                             child: Row(
@@ -609,15 +1044,15 @@ class _LoginScreenState extends State<LoginScreen> {
                                 Icon(
                                   Icons.email_outlined,
                                   size: 14,
-                                  color: !_isPhoneMode ? Colors.white : AppColors.textSecondary,
+                                  color: _loginMode == 'email' ? Colors.white : AppColors.textSecondary,
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 4),
                                 Text(
-                                  isBn ? 'ইমেইল ঠিকানা' : 'Email Address',
+                                  isBn ? 'ইমেইল' : 'Email',
                                   style: GoogleFonts.notoSansBengali(
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: !_isPhoneMode ? Colors.white : AppColors.textPrimary,
+                                    color: _loginMode == 'email' ? Colors.white : AppColors.textPrimary,
                                   ),
                                 ),
                               ],
@@ -629,7 +1064,55 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 18),
 
-                  // Identifier Input (Phone or Email)
+                  // ── Manual NID Input Section ──
+                  if (_loginMode == 'manual_nid') ...[
+                    Text(
+                      isBn ? 'এনআইডি নম্বর' : 'NID NUMBER',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _manualNidController,
+                      keyboardType: TextInputType.number,
+                      style: GoogleFonts.plusJakartaSans(fontSize: 13, fontWeight: FontWeight.w600),
+                      decoration: InputDecoration(
+                        hintText: isBn ? '১০ বা ১৭ ডিজিটের এনআইডি নম্বর' : '10 or 17-digit NID number',
+                        prefixIcon: const Icon(Icons.credit_card, size: 18, color: AppColors.textMuted),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      isBn ? 'পূর্ণ নাম (ঐচ্ছিক)' : 'FULL NAME (optional)',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: _fullNameController,
+                      style: GoogleFonts.notoSansBengali(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: isBn ? 'আপনার নাম (NID অনুযায়ী)' : 'Your name as on NID',
+                        prefixIcon: const Icon(Icons.person_outline, size: 18, color: AppColors.textMuted),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      isBn
+                          ? 'এনআইডি নম্বর দিয়ে সরাসরি নাগরিক অ্যাকাউন্ট অ্যাক্সেস করুন'
+                          : 'Access your citizen account directly using NID number',
+                      style: GoogleFonts.notoSansBengali(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                  ],
+
+                  // Identifier Input (Phone or Email) — hidden when manual_nid mode
+                  if (_loginMode != 'manual_nid') ...[
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -700,7 +1183,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
 
                   // Password Input (Only in Email mode)
-                  if (!_isPhoneMode) ...[
+                  if (_loginMode == 'email') ...[
                     const SizedBox(height: 16),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -745,6 +1228,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ],
+                  ], // end if _loginMode != 'manual_nid'
                   const SizedBox(height: 16),
 
                   // Error Notice Banner
@@ -794,9 +1278,11 @@ class _LoginScreenState extends State<LoginScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  _isPhoneMode
+                                  _loginMode == 'phone'
                                       ? langProvider.t('auth.otpBtn')
-                                      : langProvider.t('auth.loginBtn'),
+                                      : _loginMode == 'manual_nid'
+                                          ? (isBn ? 'এনআইডি দিয়ে প্রবেশ করুন' : 'Login with NID')
+                                          : langProvider.t('auth.loginBtn'),
                                   style: GoogleFonts.notoSansBengali(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w700,

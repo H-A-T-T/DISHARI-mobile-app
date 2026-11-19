@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../config/constants.dart';
 import '../../providers/language_provider.dart';
@@ -242,6 +244,37 @@ const Map<String, DivisionWeather> districtWeatherData = {
   ),
 };
 
+// --- Region coordinates (same as web) ---
+const Map<String, List<double>> _regionLatLon = {
+  'netrokona': [24.8732, 90.7279],
+  'dhaka': [23.8103, 90.4125],
+  'chattogram': [22.3569, 91.7832],
+  'sylhet': [24.8949, 91.8687],
+  'rajshahi': [24.3745, 88.6042],
+  'rangpur': [25.7439, 89.2752],
+  'khulna': [22.8456, 89.5403],
+  'barishal': [22.7010, 90.3535],
+};
+
+String _mapWmoCode(int code, bool isBn) {
+  if (code == 0) return isBn ? 'পরিষ্কার আকাশ' : 'Clear Sky';
+  if (code <= 3) return isBn ? 'আংশিক মেঘলা' : 'Partly Cloudy';
+  if (code <= 48) return isBn ? 'কুয়াশাচ্ছন্ন' : 'Foggy';
+  if (code <= 57) return isBn ? 'গুঁড়ি গুঁড়ি বৃষ্টি' : 'Drizzle';
+  if (code <= 67) return isBn ? 'বৃষ্টিপাত' : 'Rainy';
+  if (code <= 77) return isBn ? 'তুষারপাত' : 'Snowy';
+  if (code <= 82) return isBn ? 'বৃষ্টির ঝাপটা' : 'Rain Showers';
+  if (code <= 86) return isBn ? 'তুষার ঝাপটা' : 'Snow Showers';
+  if (code <= 99) return isBn ? 'বজ্রবৃষ্টি' : 'Thunderstorm';
+  return isBn ? 'অজানা' : 'Unknown';
+}
+
+String _wmoIcon(int code) {
+  if (code == 0 || code == 1) return 'sun';
+  if (code <= 48) return 'cloud';
+  return 'rain';
+}
+
 class WeatherAdvisory extends StatefulWidget {
   const WeatherAdvisory({super.key});
 
@@ -251,15 +284,80 @@ class WeatherAdvisory extends StatefulWidget {
 
 class _WeatherAdvisoryState extends State<WeatherAdvisory> {
   String _selectedRegion = 'netrokona';
+  bool _isLoadingLive = false;
+  Map<String, dynamic>? _liveData; // null = use static fallback
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLiveWeather(_selectedRegion);
+  }
+
+  Future<void> _fetchLiveWeather(String region) async {
+    final coords = _regionLatLon[region];
+    if (coords == null) return;
+    setState(() => _isLoadingLive = true);
+    try {
+      final lat = coords[0];
+      final lon = coords[1];
+      final url = Uri.parse(
+        'https://api.open-meteo.com/v1/forecast'
+        '?latitude=$lat&longitude=$lon'
+        '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m'
+        '&hourly=precipitation_probability'
+        '&forecast_days=1'
+        '&timezone=Asia%2FDhaka',
+      );
+      final res = await http.get(url).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        final json = jsonDecode(res.body) as Map<String, dynamic>;
+        final current = json['current'] as Map<String, dynamic>;
+        final hourlyProb = (json['hourly']?['precipitation_probability'] as List?) ?? [];
+        final rainProb = hourlyProb.isNotEmpty
+            ? (hourlyProb[0] as num).toInt()
+            : 0;
+        setState(() {
+          _liveData = {
+            'temp': (current['temperature_2m'] as num).round(),
+            'humidity': (current['relative_humidity_2m'] as num).round(),
+            'windKm': (current['wind_speed_10m'] as num).round(),
+            'wmoCode': (current['weather_code'] as num).toInt(),
+            'rainProb': rainProb,
+          };
+          _isLoadingLive = false;
+        });
+        return;
+      }
+    } catch (_) {}
+    // fallback to static on error
+    setState(() {
+      _liveData = null;
+      _isLoadingLive = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final langProvider = context.watch<LanguageProvider>();
     final isBn = langProvider.isBn;
-    final current = districtWeatherData[_selectedRegion] ?? districtWeatherData['dhaka']!;
+    final staticData = districtWeatherData[_selectedRegion] ?? districtWeatherData['dhaka']!;
 
-    final isAlert = current.advisoryType == 'alert';
-    final isAdvisory = current.advisoryType == 'advisory';
+    // Merge live API data over static fallback
+    final int temp = _liveData?['temp'] ?? staticData.temp;
+    final int humidity = _liveData?['humidity'] ?? staticData.humidity;
+    final int windKm = _liveData?['windKm'] ?? staticData.windKm;
+    final int rainProb = _liveData?['rainProb'] ?? staticData.rainProb;
+    final int wmoCode = _liveData?['wmoCode'] ?? 0;
+    final String conditionBn = _liveData != null
+        ? _mapWmoCode(wmoCode, true)
+        : staticData.conditionBn;
+    final String conditionEn = _liveData != null
+        ? _mapWmoCode(wmoCode, false)
+        : staticData.conditionEn;
+    final String icon = _liveData != null ? _wmoIcon(wmoCode) : staticData.icon;
+
+    final isAlert = staticData.advisoryType == 'alert';
+    final isAdvisory = staticData.advisoryType == 'advisory';
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -379,6 +477,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                       onChanged: (String? val) {
                         if (val != null) {
                           setState(() => _selectedRegion = val);
+                          _fetchLiveWeather(val);
                         }
                       },
                       items: districtWeatherData.entries.map((e) {
@@ -398,26 +497,54 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
           // Weather Snapshot Card
           Padding(
             padding: const EdgeInsets.all(14),
-            child: Column(
+            child: _isLoadingLive
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(24),
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryGreen,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  )
+                : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      isBn ? '${current.divisionBn} বিভাগ' : '${current.divisionEn} Division',
+                      isBn ? '${staticData.divisionBn} বিভাগ' : '${staticData.divisionEn} Division',
                       style: GoogleFonts.notoSansBengali(
                         fontSize: 11,
                         color: AppColors.textMuted,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Text(
-                      isBn ? 'আজকের পূর্বাভাস' : "Today's Forecast",
-                      style: GoogleFonts.notoSansBengali(
-                        fontSize: 11,
-                        color: AppColors.textMuted,
-                      ),
+                    Row(
+                      children: [
+                        if (_liveData != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            color: AppColors.primaryGreen,
+                            child: Text(
+                              isBn ? 'লাইভ ডেটা' : 'LIVE',
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 8.5,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isBn ? 'আজকের পূর্বাভাস' : "Today's Forecast",
+                          style: GoogleFonts.notoSansBengali(
+                            fontSize: 11,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -434,15 +561,15 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Icon(
-                        current.icon == 'sun'
+                        icon == 'sun'
                             ? Icons.wb_sunny
-                            : current.icon == 'rain'
+                            : icon == 'rain'
                                 ? Icons.water_drop
                                 : Icons.cloud,
                         size: 26,
-                        color: current.icon == 'sun'
+                        color: icon == 'sun'
                             ? Colors.amber[700]
-                            : current.icon == 'rain'
+                            : icon == 'rain'
                                 ? Colors.blue[600]
                                 : AppColors.primaryGreen,
                       ),
@@ -452,7 +579,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${isBn ? AppConstants.toBengaliNumber(current.temp) : current.temp}°C',
+                          '${isBn ? AppConstants.toBengaliNumber(temp) : temp}°C',
                           style: GoogleFonts.plusJakartaSans(
                             fontSize: 24,
                             fontWeight: FontWeight.w800,
@@ -460,7 +587,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                           ),
                         ),
                         Text(
-                          isBn ? current.conditionBn : current.conditionEn,
+                          isBn ? conditionBn : conditionEn,
                           style: GoogleFonts.notoSansBengali(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -492,7 +619,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${isBn ? AppConstants.toBengaliNumber(current.rainProb) : current.rainProb}%',
+                              '${isBn ? AppConstants.toBengaliNumber(rainProb) : rainProb}%',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -520,7 +647,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${isBn ? AppConstants.toBengaliNumber(current.humidity) : current.humidity}%',
+                              '${isBn ? AppConstants.toBengaliNumber(humidity) : humidity}%',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -548,7 +675,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${isBn ? AppConstants.toBengaliNumber(current.windKm) : current.windKm} ${isBn ? "কিমি/ঘ" : "km/h"}',
+                              '${isBn ? AppConstants.toBengaliNumber(windKm) : windKm} ${isBn ? "কিমি/ঘ" : "km/h"}',
                               style: GoogleFonts.plusJakartaSans(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
@@ -603,7 +730,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: Text(
-                              isBn ? current.advisoryTitleBn : current.advisoryTitleEn,
+                              isBn ? staticData.advisoryTitleBn : staticData.advisoryTitleEn,
                               style: GoogleFonts.notoSansBengali(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -619,7 +746,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isBn ? current.advisoryDescBn : current.advisoryDescEn,
+                        isBn ? staticData.advisoryDescBn : staticData.advisoryDescEn,
                         style: GoogleFonts.notoSansBengali(
                           fontSize: 11,
                           color: AppColors.textPrimary,
@@ -662,7 +789,7 @@ class _WeatherAdvisoryState extends State<WeatherAdvisory> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        isBn ? current.cropAdviceBn : current.cropAdviceEn,
+                        isBn ? staticData.cropAdviceBn : staticData.cropAdviceEn,
                         style: GoogleFonts.notoSansBengali(
                           fontSize: 11,
                           color: AppColors.textSecondary,

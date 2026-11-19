@@ -106,7 +106,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       // Persistent top AppBar with dual language pill, notifications and hamburger toggle
       appBar: CustomAppBar(
         onNotificationTap: () {
-          _onTabTapped(3); // Jump to Deadlines tab
+          CustomAppBar.showNotificationSheet(context, onNavigateTab: _onTabTapped);
         },
       ),
       // Windows 10 Action Center Drawer (Matches web Navbar.tsx slide-out)

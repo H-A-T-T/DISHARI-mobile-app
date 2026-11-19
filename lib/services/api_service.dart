@@ -97,7 +97,7 @@ class ApiService {
               'password': password,
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 12));
 
       final json = jsonDecode(response.body);
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -105,19 +105,14 @@ class ApiService {
         await StorageService.saveUser(user);
         return (success: true, user: user, error: null);
       } else {
-        return (success: false, user: null, error: json['error']?.toString() ?? 'Registration failed');
+        return (success: false, user: null, error: json['error']?.toString() ?? 'নিবন্ধন ব্যর্থ হয়েছে');
       }
-    } catch (_) {
-      // Offline fallback demo user matching web client
-      final fallbackUser = UserProfile(
-        id: 1,
-        fullName: fullName,
-        phone: phone,
-        email: email,
-        citizenId: 'BD-USER-${100 + Random().nextInt(900)}',
+    } catch (e) {
+      return (
+        success: false,
+        user: null,
+        error: 'সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি ($e)। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করুন।'
       );
-      await StorageService.saveUser(fallbackUser);
-      return (success: true, user: fallbackUser, error: null);
     }
   }
 
@@ -135,7 +130,7 @@ class ApiService {
               'password': password,
             }),
           )
-          .timeout(const Duration(seconds: 5));
+          .timeout(const Duration(seconds: 12));
 
       final json = jsonDecode(response.body);
       if (response.statusCode == 200 && json['success'] == true) {
@@ -143,19 +138,14 @@ class ApiService {
         await StorageService.saveUser(user);
         return (success: true, user: user, error: null);
       } else {
-        return (success: false, user: null, error: json['error']?.toString() ?? 'Login failed');
+        return (success: false, user: null, error: json['error']?.toString() ?? 'লগইন ব্যর্থ হয়েছে');
       }
-    } catch (_) {
-      // Offline fallback demo user matching web client
-      final fallbackUser = UserProfile(
-        id: 1,
-        fullName: 'নাগরিক',
-        phone: identifier,
-        email: identifier.contains('@') ? identifier : null,
-        citizenId: 'BD-USER-782',
+    } catch (e) {
+      return (
+        success: false,
+        user: null,
+        error: 'সার্ভারের সাথে সংযোগ স্থাপন করা যায়নি ($e)। অনুগ্রহ করে ইন্টারনেট সংযোগ পরীক্ষা করুন।'
       );
-      await StorageService.saveUser(fallbackUser);
-      return (success: true, user: fallbackUser, error: null);
     }
   }
 
@@ -167,7 +157,7 @@ class ApiService {
         if (userId != null) 'userId': userId.toString(),
       });
 
-      final response = await http.get(uri, headers: defaultHeaders).timeout(const Duration(seconds: 2));
+      final response = await http.get(uri, headers: defaultHeaders).timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
         final List jsonList = jsonDecode(response.body);
@@ -179,10 +169,9 @@ class ApiService {
       // Fallback below
     }
 
-    // Load from local storage with demo seed fallback
+    // Load from local storage for current session
     final local = await StorageService.getDocuments();
     if (local.isNotEmpty) return local;
-    if (userId == 1) return SeedData.demoDocuments;
     return [];
   }
 
@@ -195,13 +184,14 @@ class ApiService {
     required String fileData,
     Map<String, dynamic>? extractedMeta,
   }) async {
+    final safeUserId = userId != null ? (userId % 2000000000) : 1;
     try {
       final response = await http
           .post(
             Uri.parse('$baseUrl/documents/upload'),
             headers: defaultHeaders,
             body: jsonEncode({
-              'userId': userId ?? 1,
+              'userId': safeUserId,
               'docType': docType,
               'fileName': fileName,
               'fileSize': fileSize,
@@ -210,7 +200,7 @@ class ApiService {
               'extractedMeta': extractedMeta ?? {},
             }),
           )
-          .timeout(const Duration(seconds: 6));
+          .timeout(const Duration(seconds: 15));
 
       final json = jsonDecode(response.body);
       if (response.statusCode == 201 && json['success'] == true) {
@@ -221,13 +211,13 @@ class ApiService {
         return (success: true, document: doc, error: null);
       }
     } catch (_) {
-      // Offline fallback
+      // Fallback below
     }
 
-    // Local fallback matching web
+    // Local secure storage fallback if offline
     final mockDoc = CitizenDocument(
-      id: DateTime.now().millisecondsSinceEpoch,
-      userId: userId ?? 1,
+      id: (DateTime.now().millisecondsSinceEpoch % 2000000000),
+      userId: safeUserId,
       docType: docType,
       fileName: fileName,
       fileSize: fileSize,
@@ -500,6 +490,112 @@ Return strictly a valid JSON object without markdown code fences with detected f
     }
 
     return SeedData.defaultDeadlines;
+  }
+
+  // ─── JONOBONDHU BACKEND AI & LIVE RESULT ENDPOINTS ────────────────────────
+
+  /// Calls the official backend Jonobondhu AI engine (/api/chat/jonobondhu)
+  static Future<String?> chatJonobondhu({
+    required String message,
+    required bool isBn,
+    List<({bool isUser, String text})>? history,
+  }) async {
+    try {
+      final payload = <String, dynamic>{
+        'message': message,
+        'lang': isBn ? 'bn' : 'en',
+      };
+      if (history != null && history.isNotEmpty) {
+        payload['history'] = history
+            .map((m) => {
+                  'isUser': m.isUser,
+                  'text': m.text,
+                })
+            .toList();
+      }
+
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/chat/jonobondhu'),
+            headers: defaultHeaders,
+            body: jsonEncode(payload),
+          )
+          .timeout(const Duration(seconds: 12));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body);
+        if (json['reply'] != null) {
+          return json['reply'].toString().trim();
+        }
+      }
+    } catch (e) {
+      // Fallback handled by caller
+    }
+    return null;
+  }
+
+  /// Scans student admit card using backend OCR pipeline (/api/result/scan-admit-card)
+  static Future<Map<String, dynamic>?> scanAdmitCard({
+    required String imageBase64,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/result/scan-admit-card'),
+            headers: defaultHeaders,
+            body: jsonEncode({'imageBase64': imageBase64}),
+          )
+          .timeout(const Duration(seconds: 25));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Initializes live Board session for exam results (/api/result/hsc/init)
+  static Future<Map<String, dynamic>?> fetchHscInit({
+    required Map<String, dynamic> params,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/result/hsc/init'),
+            headers: defaultHeaders,
+            body: jsonEncode(params),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// Fetches final result using solved CAPTCHA (/api/result/hsc/fetch)
+  static Future<Map<String, dynamic>?> fetchHscResult({
+    required String sessionId,
+    required String captchaAnswer,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            Uri.parse('$baseUrl/result/hsc/fetch'),
+            headers: defaultHeaders,
+            body: jsonEncode({
+              'sessionId': sessionId,
+              'captchaAnswer': captchaAnswer,
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+    } catch (_) {}
+    return null;
   }
 }
 

@@ -40,7 +40,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
     // Try finding in services provider first
     final provider = Provider.of<ServicesProvider>(context, listen: false);
-    final match = provider.services.where((s) => s.slug == widget.slug).firstOrNull;
+    final match =
+        provider.services.where((s) => s.slug == widget.slug).firstOrNull;
 
     if (match != null) {
       _service = match;
@@ -85,7 +86,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         ),
         body: Center(
           child: Text(
-            isBn ? 'দুঃখিত, সেবাটির তথ্য পাওয়া যায়নি।' : 'Service information not found.',
+            isBn
+                ? 'দুঃখিত, সেবাটির তথ্য পাওয়া যায়নি।'
+                : 'Service information not found.',
             style: GoogleFonts.notoSansBengali(),
           ),
         ),
@@ -99,7 +102,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       appBar: AppBar(
         title: Text(
           isBn ? s.nameBn : s.nameEn,
-          style: GoogleFonts.notoSansBengali(fontSize: 16, fontWeight: FontWeight.w700),
+          style: GoogleFonts.notoSansBengali(
+              fontSize: 16, fontWeight: FontWeight.w700),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -127,7 +131,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.verified, size: 14, color: AppColors.primaryGreen),
+                  const Icon(Icons.verified,
+                      size: 14, color: AppColors.primaryGreen),
                   const SizedBox(width: 6),
                   Text(
                     langProvider.t('detail.verified'),
@@ -278,7 +283,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.place_outlined, size: 16, color: AppColors.primaryGreen),
+                  const Icon(Icons.place_outlined,
+                      size: 16, color: AppColors.primaryGreen),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Column(
@@ -357,7 +363,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       alignment: Alignment.center,
                       color: AppColors.lightGreen50,
                       child: Text(
-                        isBn ? AppConstants.toBengaliNumber(st.step) : '${st.step}',
+                        isBn
+                            ? AppConstants.toBengaliNumber(st.step)
+                            : '${st.step}',
                         style: GoogleFonts.plusJakartaSans(
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
@@ -411,7 +419,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.info_outline, size: 16, color: AppColors.amber500),
+                        const Icon(Icons.info_outline,
+                            size: 16, color: AppColors.amber500),
                         const SizedBox(width: 6),
                         Text(
                           langProvider.t('detail.importantNotes'),
@@ -461,7 +470,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   if (!auth.isLoggedIn) {
                     await auth.loginAsDemoCitizen();
                     if (context.mounted) {
-                      await Provider.of<DashboardProvider>(context, listen: false).seedDemoData();
+                      await Provider.of<DashboardProvider>(context,
+                              listen: false)
+                          .seedDemoData();
                     }
                   }
                   if (context.mounted) {
@@ -471,7 +482,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 icon: const Icon(Icons.auto_awesome, size: 16),
                 label: Text(
                   langProvider.t('detail.autoApply'),
-                  style: GoogleFonts.notoSansBengali(fontSize: 12, fontWeight: FontWeight.w700),
+                  style: GoogleFonts.notoSansBengali(
+                      fontSize: 12, fontWeight: FontWeight.w700),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGreen,
@@ -490,7 +502,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   shape: const RoundedRectangleBorder(),
                 ),
-                child: const Icon(Icons.open_in_new, size: 18, color: AppColors.textPrimary),
+                child: const Icon(Icons.open_in_new,
+                    size: 18, color: AppColors.textPrimary),
               ),
             ),
           ],

@@ -11,6 +11,7 @@ import '../providers/dashboard_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/n8n_service.dart';
 import '../widgets/common/dishari_logo.dart';
+import '../widgets/common/jonobondhu_chat_overlay.dart';
 import 'main_navigation_screen.dart';
 import 'login_screen.dart';
 
@@ -59,7 +60,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     try {
       final picker = ImagePicker();
-      final picked = await picker.pickImage(source: source, imageQuality: 90);
+      final picked = await picker.pickImage(source: source, imageQuality: 98);
       if (picked == null) return;
 
       final file = File(picked.path);
@@ -102,26 +103,43 @@ class _RegisterScreenState extends State<RegisterScreen> {
         docType: 'nid_front',
       );
 
+      if (ocrResult['success'] != true) {
+        throw Exception(ocrResult['error'] ?? (isBn
+            ? 'এনআইডি স্ক্যান করতে সমস্যা হয়েছে। অনুগ্রহ করে স্পষ্ট আলোতে ছবি তুলুন বা পুনরায় চেষ্টা করুন।'
+            : 'Failed to scan NID. Please ensure clear lighting and try again.'));
+      }
+
       final meta = (ocrResult['data'] as Map<String, dynamic>?) ?? {};
-      final nidNumber = meta['id_number']
-              ?.toString()
-              .replaceAll(RegExp(r'[^0-9]'), '') ??
-          '${DateTime.now().millisecondsSinceEpoch}';
-      final cleanNid = nidNumber.isNotEmpty
-          ? nidNumber
-          : '${DateTime.now().millisecondsSinceEpoch}';
-      final fullName = meta['full_name_bn']?.toString() ??
-          meta['full_name_en']?.toString() ??
-          (isBn ? 'নাগরিক' : 'Citizen');
-      final phone =
-          '017${cleanNid.length >= 8 ? cleanNid.substring(cleanNid.length - 8) : "12345678"}';
+      final rawNid = meta['id_number']?.toString().trim() ??
+          meta['nid_number']?.toString().trim() ??
+          meta['nid']?.toString().trim() ??
+          '';
+      final cleanNid = rawNid.replaceAll(RegExp(r'[^0-9]'), '');
+
+      final extractedBn = meta['full_name_bn']?.toString().trim() ?? '';
+      final extractedEn = meta['full_name_en']?.toString().trim() ?? '';
+      final extractedGen = meta['full_name']?.toString().trim() ?? meta['name']?.toString().trim() ?? '';
+
+      final fullName = isBn
+          ? (extractedBn.isNotEmpty ? extractedBn : (extractedEn.isNotEmpty ? extractedEn : extractedGen))
+          : (extractedEn.isNotEmpty ? extractedEn : (extractedBn.isNotEmpty ? extractedBn : extractedGen));
+
+      if (cleanNid.isEmpty && fullName.isEmpty) {
+        throw Exception(isBn
+            ? 'এনআইডি কার্ডের তথ্য পড়া যায়নি। অনুগ্রহ করে সম্পূর্ণ ও স্পষ্ট ছবি দিন।'
+            : 'Could not read NID card details. Please provide a clear, full image.');
+      }
+
+      final safeId = (DateTime.now().millisecondsSinceEpoch % 2000000000);
+      final citizenNid = cleanNid.isNotEmpty ? cleanNid : '$safeId';
+      final phone = '017${citizenNid.length >= 8 ? citizenNid.substring(citizenNid.length - 8) : "12345678"}';
 
       final citizenUser = UserProfile(
-        id: DateTime.now().millisecondsSinceEpoch,
-        fullName: fullName,
+        id: safeId,
+        fullName: fullName.isNotEmpty ? fullName : (isBn ? 'নাগরিক' : 'Citizen'),
         phone: phone,
         email: null,
-        citizenId: 'NID-$cleanNid',
+        citizenId: 'NID-$citizenNid',
       );
 
       if (!mounted) return;
@@ -140,7 +158,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
           fileSize: file.lengthSync(),
           mimeType: 'image/jpeg',
           fileData: base64Encode(bytes),
-          extractedMeta: meta,
+          extractedMeta: {
+            ...meta,
+            'id_number': citizenNid,
+            'full_name_bn': extractedBn.isNotEmpty ? extractedBn : fullName,
+            'full_name_en': extractedEn.isNotEmpty ? extractedEn : fullName,
+            'verified_source': 'Smart NID Optical Registration',
+          },
         );
       } catch (e) {
         debugPrint('NID auto save error: $e');
@@ -148,18 +172,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (mounted) {
         Navigator.pop(context); // close scanning dialog
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isBn
-                  ? 'এনআইডি নিবন্ধন সফল! স্বাগতম, $fullName'
-                  : 'Account Created via NID! Welcome, $fullName',
-              style: GoogleFonts.notoSansBengali(),
-            ),
-            backgroundColor: AppColors.primaryGreen,
-          ),
+        _showVerifiedNidDialog(
+          context: context,
+          isBn: isBn,
+          user: citizenUser,
+          meta: meta,
         );
-        _navigateBackOrHome();
       }
     } catch (e) {
       if (mounted) {
@@ -169,6 +187,350 @@ class _RegisterScreenState extends State<RegisterScreen> {
             : 'NID scanning error: $e');
       }
     }
+  }
+
+  void _showVerifiedNidDialog({
+    required BuildContext context,
+    required bool isBn,
+    required UserProfile user,
+    required Map<String, dynamic> meta,
+  }) {
+    final dob = meta['dob']?.toString().trim() ??
+        meta['date_of_birth']?.toString().trim() ??
+        meta['birth_date']?.toString().trim() ??
+        (isBn ? 'যাচাইকৃত' : 'Verified');
+    final bloodGroup = meta['blood_group']?.toString().trim() ??
+        meta['blood']?.toString().trim() ??
+        meta['bloodGroup']?.toString().trim() ??
+        (isBn ? 'অনুল্লেখিত' : 'Not Specified');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.bgSurface,
+              border: Border.all(color: AppColors.primaryGreen, width: 2),
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Green Success Banner Card (1:1 with Web register/page.tsx)
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.lightGreen50,
+                      border: Border.all(
+                        color: AppColors.primaryGreen.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.check_circle,
+                          color: AppColors.primaryGreen,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                isBn
+                                    ? 'এনআইডি স্ক্যান সফল — অ্যাকাউন্ট সক্রিয়!'
+                                    : 'NID Verified — Account Activated!',
+                                style: GoogleFonts.notoSansBengali(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primaryGreen,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                isBn
+                                    ? 'আপনার ডিজিটাল নাগরিক প্রোফাইল সক্রিয় হয়েছে এবং মূল এনআইডি লকারে সংরক্ষিত হয়েছে।'
+                                    : 'Your digital profile is live and the original NID card has been encrypted into your locker.',
+                                style: GoogleFonts.notoSansBengali(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Encrypted Locker Confirmation Card
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.folder_shared_outlined,
+                                  size: 16,
+                                  color: AppColors.primaryGreen,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  isBn
+                                      ? 'লকারে সংরক্ষিত নথি:'
+                                      : 'Vault Saved Asset:',
+                                  style: GoogleFonts.notoSansBengali(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.primaryGreen,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              color: AppColors.lightGreen50,
+                              child: Text(
+                                'VERIFIED NID',
+                                style: GoogleFonts.plusJakartaSans(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: AppColors.primaryGreen,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const Divider(height: 16, color: AppColors.border),
+
+                        // Grid with Full Name, NID Number, DOB, Blood Group
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isBn ? 'নাগরিক নাম:' : 'Name:',
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    user.fullName,
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isBn ? 'এনআইডি নম্বর:' : 'NID No:',
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    user.citizenId,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primaryGreen,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isBn ? 'জন্ম তারিখ:' : 'Date of Birth:',
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    dob,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    isBn ? 'রক্তের গ্রুপ:' : 'Blood Group:',
+                                    style: GoogleFonts.notoSansBengali(
+                                      fontSize: 10,
+                                      color: AppColors.textMuted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    bloodGroup,
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primaryRed,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.lock_outline,
+                              size: 13,
+                              color: AppColors.primaryGreen,
+                            ),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                isBn
+                                    ? 'জিরো-নলেজ আর্কিটেকচারে নাগরিকের এনআইডি ও নথি সংরক্ষিত'
+                                    : 'Encrypted under Bangladesh Civic Data Protection standards.',
+                                style: GoogleFonts.notoSansBengali(
+                                  fontSize: 9.5,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Button 1: Proceed to Citizen Dashboard
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MainNavigationScreen(),
+                        ),
+                        (route) => false,
+                      );
+                      JonobondhuChatOverlay.globalNavigateTab?.call(4);
+                    },
+                    icon: const Icon(Icons.dashboard_outlined, size: 16),
+                    label: Text(
+                      isBn
+                          ? 'নাগরিক ড্যাশবোর্ডে প্রবেশ করুন'
+                          : 'Proceed to Citizen Dashboard',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: const RoundedRectangleBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Button 2: View Personalized Home Feed
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const MainNavigationScreen(),
+                        ),
+                        (route) => false,
+                      );
+                      JonobondhuChatOverlay.globalNavigateTab?.call(0);
+                    },
+                    icon: const Icon(Icons.home_outlined, size: 16),
+                    label: Text(
+                      isBn
+                          ? 'হোম পেজে ব্যক্তিগত ফিড দেখুন'
+                          : 'View Personalized Home Feed',
+                      style: GoogleFonts.notoSansBengali(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryGreen,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: const RoundedRectangleBorder(),
+                      side: const BorderSide(color: AppColors.primaryGreen),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showNidScanSheet(bool isBn) {

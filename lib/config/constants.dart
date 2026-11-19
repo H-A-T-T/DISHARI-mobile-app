@@ -17,29 +17,29 @@ class AppColors {
   static const Color amber50 = Color(0xFFFFFBEB);
   static const Color amber100 = Color(0xFFFEF3C7);
 
-  // Neutral Palette (Clean Windows 10 Flat Warm Paper)
-  static const Color bgPage = Color(0xFFFAFAF8);
+  // Neutral Palette (Windows 10 Flat Civic)
+  static const Color bgPage = Color(0xFFF5F6F8);
   static const Color bgSurface = Color(0xFFFFFFFF);
-  static const Color bgMuted = Color(0xFFF4F4F2);
-  static const Color bgCardSubtle = Color(0xFFF9F9F8);
+  static const Color bgMuted = Color(0xFFF3F4F6);
+  static const Color bgCardSubtle = Color(0xFFFAFAFA);
 
-  static const Color textPrimary = Color(0xFF1C1917);
-  static const Color textSecondary = Color(0xFF78716C);
-  static const Color textMuted = Color(0xFFA8A29E);
+  static const Color textPrimary = Color(0xFF18181B);
+  static const Color textSecondary = Color(0xFF525252);
+  static const Color textMuted = Color(0xFF737373);
 
-  static const Color border = Color(0xFFE7E5E4);
-  static const Color borderStrong = Color(0xFFD6D3D1);
-  static const Color borderSubtle = Color(0xFFF0EFEB);
+  static const Color border = Color(0xFFE5E7EB);
+  static const Color borderStrong = Color(0xFFD4D4D4);
+  static const Color borderSubtle = Color(0xFFF0F0F0);
 
   // Service Category Colors
-  static const Color catIdentity = Color(0xFF3B82F6);   // Blue
-  static const Color catEducation = Color(0xFF8B5CF6);  // Purple
-  static const Color catLand = Color(0xFFF59E0B);       // Amber
-  static const Color catWelfare = Color(0xFFEC4899);    // Pink
-  static const Color catBusiness = Color(0xFF14B8A6);   // Teal
-  static const Color catTax = Color(0xFFF97316);        // Orange
-  static const Color catOverseas = Color(0xFF06B6D4);   // Cyan
-  static const Color catHealth = Color(0xFF22C55E);     // Green
+  static const Color catIdentity = Color(0xFF3B82F6); // Blue
+  static const Color catEducation = Color(0xFF8B5CF6); // Purple
+  static const Color catLand = Color(0xFFF59E0B); // Amber
+  static const Color catWelfare = Color(0xFFEC4899); // Pink
+  static const Color catBusiness = Color(0xFF14B8A6); // Teal
+  static const Color catTax = Color(0xFFF97316); // Orange
+  static const Color catOverseas = Color(0xFF06B6D4); // Cyan
+  static const Color catHealth = Color(0xFF22C55E); // Green
 }
 
 class CategoryMeta {
@@ -165,8 +165,16 @@ class AppConstants {
 
   static String toEnglishNumber(String input) {
     const bnToEn = {
-      '০': '0', '১': '1', '২': '2', '৩': '3', '৪': '4',
-      '৫': '5', '৬': '6', '৭': '7', '৮': '8', '৯': '9',
+      '০': '0',
+      '১': '1',
+      '২': '2',
+      '৩': '3',
+      '৪': '4',
+      '৫': '5',
+      '৬': '6',
+      '৭': '7',
+      '৮': '8',
+      '৯': '9',
     };
     final buffer = StringBuffer();
     for (int i = 0; i < input.length; i++) {
@@ -187,4 +195,3 @@ class AppConstants {
     return '৳$fee';
   }
 }
-
